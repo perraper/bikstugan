@@ -28,7 +28,7 @@ function paymentReference(name: string, year: number, weekNumber: number) {
 }
 
 interface EmailPayload {
-  type: 'booking_confirmation' | 'welcome' | 'cancellation_offer' | 'lottery_result' | 'new_account' | 'booking_cancelled' | 'deposit_reminder' | 'issue_created'
+  type: 'booking_confirmation' | 'welcome' | 'cancellation_offer' | 'lottery_result' | 'new_account' | 'booking_cancelled' | 'booking_admin_notify' | 'deposit_reminder' | 'issue_created'
   userId: string
   weekNumber?: number
   year?: number
@@ -176,6 +176,41 @@ Deno.serve(async (req) => {
               <h2>Hej ${admin.name}!</h2>
               <p><strong>${user.name}</strong> (${user.email}) har skapat ett konto och väntar på godkännande.</p>
               <p>Logga in på bokningssystemet och gå till Admin → Medlemmar för att godkänna eller avvisa kontot.</p>
+              <p>Mvh, BIK-stugan</p>
+              `
+            )
+          }
+        }
+        break
+      }
+
+      case 'booking_admin_notify': {
+        const dates = getWeekDates(year!, weekNumber!)
+        const price = payload.extra?.price as number | undefined
+        const note = payload.extra?.note as string | undefined
+        const source = payload.extra?.source as string | undefined // e.g. 'reserve' for reserves taking over
+        const sourceLabel = source === 'reserve' ? ' (via reservplats)' : ''
+
+        const { data: notifyAdmins } = await supabase
+          .from('users')
+          .select('id, email, name')
+          .eq('role', 'admin')
+          .eq('approved', true)
+
+        if (notifyAdmins && notifyAdmins.length > 0) {
+          for (const admin of notifyAdmins) {
+            // Skip notifying the booking user themselves if they're an admin
+            if (admin.id === user.id) continue
+            await sendEmail(
+              admin.email,
+              `Ny bokning${sourceLabel} — Vecka ${weekNumber}, ${year}`,
+              `
+              <h2>Hej ${admin.name}!</h2>
+              <p><strong>${user.name}</strong> (${user.email}) har bokat vecka <strong>${weekNumber}</strong> (${year})${sourceLabel}.</p>
+              <p><strong>Incheckning:</strong> ${dates.checkIn}<br/>
+              <strong>Utcheckning:</strong> ${dates.checkOut}${price ? `<br/><strong>Pris:</strong> ${price} kr` : ''}</p>
+              ${note ? `<div style="background:#f8fafc;border-left:3px solid #64748b;padding:8px 12px;margin:12px 0;color:#475569"><strong>Meddelande:</strong> ${note}</div>` : ''}
+              <p style="color:#888;font-size:13px">Logga in på bokningssystemet för att se alla bokningar.</p>
               <p>Mvh, BIK-stugan</p>
               `
             )

@@ -56,6 +56,16 @@ export default function BookingModal({ week, year, onClose }) {
         body: { type: 'booking_confirmation', userId: profile.id, weekNumber: week.week_number, year },
       }).catch(console.error)
 
+      supabase.functions.invoke('send-email', {
+        body: {
+          type: 'booking_admin_notify',
+          userId: profile.id,
+          weekNumber: week.week_number,
+          year,
+          extra: { price: season.price, note: note.trim() || null },
+        },
+      }).catch(console.error)
+
       setConfirmed(true)
     }
     setLoading(false)

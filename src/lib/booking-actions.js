@@ -45,6 +45,18 @@ export async function bookWeek({ profile, year, weekNumber, note }) {
       body: { type: 'booking_confirmation', userId: profile.id, weekNumber, year },
     })
     .catch(console.error)
+
+  supabase.functions
+    .invoke('send-email', {
+      body: {
+        type: 'booking_admin_notify',
+        userId: profile.id,
+        weekNumber,
+        year,
+        extra: { price: season.price, note: note?.trim() || null },
+      },
+    })
+    .catch(console.error)
 }
 
 export async function cancelBooking({ profile, booking }) {
@@ -145,6 +157,18 @@ export async function acceptReserveOffer({ profile, offer }) {
         userId: profile.id,
         weekNumber: offer.week_number,
         year: offer.year,
+      },
+    })
+    .catch(console.error)
+
+  supabase.functions
+    .invoke('send-email', {
+      body: {
+        type: 'booking_admin_notify',
+        userId: profile.id,
+        weekNumber: offer.week_number,
+        year: offer.year,
+        extra: { price, source: 'reserve' },
       },
     })
     .catch(console.error)
