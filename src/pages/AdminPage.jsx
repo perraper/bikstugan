@@ -185,7 +185,10 @@ export default function AdminPage() {
     }
     const rows = data || []
     setPendingUsers(rows.filter((u) => !u.approved).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
-    setAllUsers(rows.filter((u) => u.approved).sort((a, b) => a.name.localeCompare(b.name, 'sv')))
+    setAllUsers(rows.filter((u) => u.approved).sort((a, b) => {
+      if (a.role !== b.role) return a.role === 'admin' ? -1 : 1
+      return a.name.localeCompare(b.name, 'sv')
+    }))
   }
 
   function formatLastSignIn(ts) {
