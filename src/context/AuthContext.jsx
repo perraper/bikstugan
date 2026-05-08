@@ -7,6 +7,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Initiera synkront baserat på URL: om hash:en innehåller type=recovery
+  // är vi i reset-flödet redan vid första render — ingen flicker av kalendern.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const hash = window.location.hash || ''
+    return hash.includes('type=recovery')
+  })
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -15,8 +22,11 @@ export function AuthProvider({ children }) {
       else setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null)
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true)
+      }
       if (session?.user) fetchProfile(session.user.id)
       else {
         setProfile(null)
@@ -71,7 +81,12 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile: () => user && fetchProfile(user.id) }}>
+    <AuthContext.Provider value={{
+      user, profile, loading, signUp, signIn, signOut,
+      isPasswordRecovery,
+      clearPasswordRecovery: () => setIsPasswordRecovery(false),
+      refreshProfile: () => user && fetchProfile(user.id),
+    }}>
       {children}
     </AuthContext.Provider>
   )

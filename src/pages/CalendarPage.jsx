@@ -9,7 +9,7 @@ const STATUS_CONFIG = {
   available:   { bg: 'bg-emerald-50', border: 'border-emerald-200', dot: 'bg-emerald-500', label: 'Ledig' },
   booked:      { bg: 'bg-red-50',     border: 'border-red-200',     dot: 'bg-red-500',     label: 'Bokad' },
   lottery:     { bg: 'bg-purple-50',  border: 'border-purple-200',  dot: 'bg-purple-500',  label: 'Lottning' },
-  maintenance: { bg: 'bg-stone-100',  border: 'border-stone-300',   dot: 'bg-amber-500',   label: 'Underhåll' },
+  maintenance: { bg: 'bg-amber-50',   border: 'border-amber-300',   dot: 'bg-amber-500',   label: 'Underhåll' },
 }
 
 export default function CalendarPage() {

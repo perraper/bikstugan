@@ -824,13 +824,18 @@ function LeaveReserveConfirm({ onCancel, onConfirm, loading }) {
 function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffer, onAfterAction }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [legacyName, setLegacyName] = useState('')
-  const [legacyNote, setLegacyNote] = useState('')
-  const [legacyType, setLegacyType] = useState('booking') // 'booking' | 'maintenance'
-  const [legacyOpen, setLegacyOpen] = useState(false)
+  // Två separata formulär — ett för underhåll, ett för manuell bokning
+  const [maintenanceName, setMaintenanceName] = useState('')
+  const [maintenanceNote, setMaintenanceNote] = useState('')
+  const [maintenanceFormOpen, setMaintenanceFormOpen] = useState(false)
+
+  const [manualName, setManualName] = useState('')
+  const [manualNote, setManualNote] = useState('')
+  const [manualFormOpen, setManualFormOpen] = useState(false)
 
   const hasRealBooking = !!booking
-  const existingLegacyName = week.isLegacy ? week.legacyName : null
+  const existingMaintenance = week.isMaintenance ? week.legacyName : null
+  const existingManual = (week.isLegacy && !week.isMaintenance) ? week.legacyName : null
 
   async function setStatus(status) {
     setBusy(true); setErr('')
@@ -872,27 +877,27 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
     setBusy(false)
   }
 
-  async function saveLegacy() {
-    if (!legacyName.trim()) return
+  async function saveLegacy(type, name, note, resetForm) {
+    if (!name.trim()) return
     setBusy(true); setErr('')
     const { error } = await supabase.from('legacy_bookings').insert({
       year,
       week_number: week.week_number,
-      booked_by_name: legacyName.trim(),
-      type: legacyType,
-      notes: legacyNote.trim() || null,
+      booked_by_name: name.trim(),
+      type,
+      notes: note.trim() || null,
     })
     if (error) setErr(error.message)
     else {
-      // För underhåll behöver inte weeks-raden ändras — UI hämtar färg från legacy.type.
-      // Men för 'booking' förvänta att veckan markeras som bokad.
-      if (legacyType === 'booking' && week.status !== 'booked') {
+      // 'booking' = manuell bokning utan medlemskonto → markera weeks som bokad.
+      // 'maintenance' kräver inte weeks-ändring (UI färgar från legacy.type).
+      if (type === 'booking' && week.status !== 'booked') {
         await supabase.from('weeks').upsert(
           { year, week_number: week.week_number, status: 'booked', price: week.price || 2000 },
           { onConflict: 'year,week_number' }
         )
       }
-      setLegacyName(''); setLegacyNote(''); setLegacyType('booking'); setLegacyOpen(false)
+      resetForm()
       await onAfterAction()
     }
     setBusy(false)
@@ -997,92 +1002,57 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
                 )
               })}
             </div>
-            {week.status === 'booked' && !hasRealBooking && !existingLegacyName && (
+            {week.status === 'booked' && !hasRealBooking && !existingManual && !existingMaintenance && (
               <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
-                Veckan är markerad som bokad men saknar bokare. Lägg till legacy-namn nedan eller ändra status.
+                Veckan är markerad som bokad men saknar bokare. Lägg till manuell bokning eller underhåll nedan, eller ändra status.
               </div>
             )}
           </div>
 
-          {/* Legacy-namn (om ingen riktig bokning finns) */}
-          {!hasRealBooking && (
-            <div className="space-y-1.5 border-b border-slate-100 pb-3">
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-slate-400 uppercase tracking-wide">Legacy-bokning</div>
-                {!legacyOpen && (
-                  <button
-                    onClick={() => setLegacyOpen(true)}
-                    className="text-[11px] text-slate-500 hover:text-slate-700"
-                  >
-                    {existingLegacyName ? 'Ändra' : '+ Lägg till namn'}
-                  </button>
-                )}
-              </div>
-              {existingLegacyName && !legacyOpen && (
-                <div className="flex items-center justify-between gap-2 bg-slate-50 rounded px-2 py-1">
-                  <span className="text-xs text-slate-600 truncate">{existingLegacyName}</span>
-                  <button
-                    disabled={busy}
-                    onClick={removeLegacy}
-                    className="text-[11px] text-slate-400 hover:text-red-500 transition-colors shrink-0 flex items-center gap-1"
-                    title="Ta bort"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    Ta bort
-                  </button>
-                </div>
-              )}
-              {legacyOpen && (
-                <div className="space-y-1.5">
-                  <div className="flex gap-1">
-                    {[
-                      { key: 'booking', label: 'Bokning', cls: 'bg-red-500 text-white', idle: 'bg-red-50 text-red-700 hover:bg-red-100' },
-                      { key: 'maintenance', label: 'Underhåll', cls: 'bg-amber-500 text-white', idle: 'bg-amber-50 text-amber-700 hover:bg-amber-100' },
-                    ].map((t) => {
-                      const active = legacyType === t.key
-                      return (
-                        <button
-                          key={t.key}
-                          onClick={() => setLegacyType(t.key)}
-                          className={`flex-1 text-[11px] font-medium rounded px-2 py-1 transition-colors ${active ? t.cls : t.idle}`}
-                        >
-                          {t.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <input
-                    type="text"
-                    value={legacyName}
-                    onChange={(e) => setLegacyName(e.target.value)}
-                    placeholder={legacyType === 'maintenance' ? 'T.ex. Renovering kök, VVS' : (existingLegacyName || 'Namn (t.ex. Mälarn)')}
-                    className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  />
-                  <input
-                    type="text"
-                    value={legacyNote}
-                    onChange={(e) => setLegacyNote(e.target.value)}
-                    placeholder="Anteckning (valfritt)"
-                    className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
-                  />
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={() => { setLegacyOpen(false); setLegacyName(''); setLegacyNote(''); setLegacyType('booking') }}
-                      className="text-[11px] text-slate-500 hover:text-slate-700 px-2 py-1"
-                    >
-                      Avbryt
-                    </button>
-                    <button
-                      disabled={busy || !legacyName.trim()}
-                      onClick={saveLegacy}
-                      className="flex-1 text-[11px] bg-slate-700 hover:bg-slate-800 disabled:opacity-50 text-white px-2 py-1 rounded"
-                    >
-                      Spara
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Underhåll / renovering */}
+          {!hasRealBooking && !existingManual && (
+            <LegacyBlock
+              label="Underhåll / renovering"
+              icon={Wrench}
+              accent="amber"
+              addLabel="Markera för underhåll"
+              placeholder="T.ex. Renovering kök, VVS"
+              existingName={existingMaintenance}
+              busy={busy}
+              formOpen={maintenanceFormOpen}
+              setFormOpen={setMaintenanceFormOpen}
+              name={maintenanceName}
+              setName={setMaintenanceName}
+              note={maintenanceNote}
+              setNote={setMaintenanceNote}
+              onSave={() => saveLegacy('maintenance', maintenanceName, maintenanceNote, () => {
+                setMaintenanceName(''); setMaintenanceNote(''); setMaintenanceFormOpen(false)
+              })}
+              onRemove={removeLegacy}
+            />
+          )}
+
+          {/* Manuell bokning utan medlemskonto */}
+          {!hasRealBooking && !existingMaintenance && (
+            <LegacyBlock
+              label="Manuell bokning (utan konto)"
+              icon={null}
+              accent="slate"
+              addLabel="Lägg till bokning"
+              placeholder="Namn på bokare (t.ex. Mälarn)"
+              existingName={existingManual}
+              busy={busy}
+              formOpen={manualFormOpen}
+              setFormOpen={setManualFormOpen}
+              name={manualName}
+              setName={setManualName}
+              note={manualNote}
+              setNote={setManualNote}
+              onSave={() => saveLegacy('booking', manualName, manualNote, () => {
+                setManualName(''); setManualNote(''); setManualFormOpen(false)
+              })}
+              onRemove={removeLegacy}
+            />
           )}
 
           {booking && (
@@ -1161,6 +1131,83 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
               {new Date(activeOffer.deadline).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LegacyBlock({
+  label, icon: Icon, accent, addLabel, placeholder,
+  existingName, busy, formOpen, setFormOpen,
+  name, setName, note, setNote, onSave, onRemove,
+}) {
+  const accentClasses = accent === 'amber'
+    ? { btn: 'bg-amber-500 hover:bg-amber-600 text-white', addBtn: 'text-amber-700 hover:text-amber-900' }
+    : { btn: 'bg-slate-700 hover:bg-slate-800 text-white', addBtn: 'text-slate-500 hover:text-slate-700' }
+
+  return (
+    <div className="space-y-1.5 border-b border-slate-100 pb-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs text-slate-400 uppercase tracking-wide">
+          {Icon && <Icon className="w-3 h-3" />}
+          {label}
+        </div>
+        {!formOpen && !existingName && (
+          <button
+            onClick={() => setFormOpen(true)}
+            className={`text-[11px] font-medium ${accentClasses.addBtn}`}
+          >
+            + {addLabel}
+          </button>
+        )}
+      </div>
+      {existingName && !formOpen && (
+        <div className="flex items-center justify-between gap-2 bg-slate-50 rounded px-2 py-1">
+          <span className="text-xs text-slate-600 truncate">{existingName}</span>
+          <button
+            disabled={busy}
+            onClick={onRemove}
+            className="text-[11px] text-slate-400 hover:text-red-500 transition-colors shrink-0 flex items-center gap-1"
+            title="Ta bort"
+          >
+            <Trash2 className="w-3 h-3" />
+            Ta bort
+          </button>
+        </div>
+      )}
+      {formOpen && (
+        <div className="space-y-1.5">
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={placeholder}
+            autoFocus
+            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+          />
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Anteckning (valfritt)"
+            className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+          />
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => { setName(''); setNote(''); setFormOpen(false) }}
+              className="text-[11px] text-slate-500 hover:text-slate-700 px-2 py-1"
+            >
+              Avbryt
+            </button>
+            <button
+              disabled={busy || !name.trim()}
+              onClick={onSave}
+              className={`flex-1 text-[11px] disabled:opacity-50 px-2 py-1 rounded ${accentClasses.btn}`}
+            >
+              Spara
+            </button>
+          </div>
         </div>
       )}
     </div>

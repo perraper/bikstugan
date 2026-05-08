@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 
 const LoginPage = lazy(() => import('./pages/LoginPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const CalendarPage = lazy(() => import('./pages/CalendarPage'))
 const BookingsPage = lazy(() => import('./pages/BookingsPage'))
 const ElectricityPage = lazy(() => import('./pages/ElectricityPage'))
@@ -45,8 +46,9 @@ function PendingApproval() {
 }
 
 function ProtectedRoute({ children }) {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, isPasswordRecovery } = useAuth()
   if (loading) return <Loading />
+  if (isPasswordRecovery) return <Navigate to="/reset-password" />
   if (!user) return <Navigate to="/login" />
   if (profile && !profile.approved) return <PendingApproval />
   return children
@@ -59,8 +61,9 @@ function AdminRoute({ children }) {
 }
 
 function AuthRoute({ children }) {
-  const { user, loading } = useAuth()
+  const { user, loading, isPasswordRecovery } = useAuth()
   if (loading) return null
+  if (isPasswordRecovery) return <Navigate to="/reset-password" />
   return user ? <Navigate to="/" /> : children
 }
 
@@ -78,6 +81,7 @@ export default function App() {
                 </AuthRoute>
               }
             />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route
               path="/"
               element={
