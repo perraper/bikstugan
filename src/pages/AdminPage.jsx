@@ -171,12 +171,38 @@ export default function AdminPage() {
   }
 
   async function fetchPendingUsers() {
-    const [{ data: pending }, { data: all }] = await Promise.all([
-      supabase.from('users').select('*').eq('approved', false).order('created_at', { ascending: true }),
-      supabase.from('users').select('*').eq('approved', true).order('name'),
-    ])
-    setPendingUsers(pending || [])
-    setAllUsers(all || [])
+    const { data, error } = await supabase.rpc('get_admin_users_with_auth')
+    if (error) {
+      console.error(error)
+      // Fallback om migrationen inte är körd än
+      const [{ data: pending }, { data: all }] = await Promise.all([
+        supabase.from('users').select('*').eq('approved', false).order('created_at', { ascending: true }),
+        supabase.from('users').select('*').eq('approved', true).order('name'),
+      ])
+      setPendingUsers(pending || [])
+      setAllUsers(all || [])
+      return
+    }
+    const rows = data || []
+    setPendingUsers(rows.filter((u) => !u.approved).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
+    setAllUsers(rows.filter((u) => u.approved).sort((a, b) => a.name.localeCompare(b.name, 'sv')))
+  }
+
+  function formatLastSignIn(ts) {
+    if (!ts) return 'Aldrig inloggad'
+    const date = new Date(ts)
+    const diffMs = Date.now() - date.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return 'just nu'
+    if (diffMin < 60) return `${diffMin} min sedan`
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return `${diffHours} h sedan`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays === 1) return 'i går'
+    if (diffDays < 30) return `${diffDays} dagar sedan`
+    const diffMonths = Math.floor(diffDays / 30)
+    if (diffMonths < 12) return `${diffMonths} mån sedan`
+    return date.toLocaleDateString('sv-SE')
   }
 
   async function approveUser(userId) {
@@ -206,6 +232,27 @@ export default function AdminPage() {
     const newRole = currentRole === 'admin' ? 'member' : 'admin'
     await supabase.from('users').update({ role: newRole }).eq('id', userId)
     setAllUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u))
+  }
+
+  function deleteMember(user) {
+    if (user.id === profile?.id) return
+    setConfirmDialog({
+      title: `Ta bort ${user.name}?`,
+      body: 'Kontot anonymiseras (kan inte logga in mer). Bokningar och historik bevaras men visas som "Borttagen medlem".',
+      confirmLabel: 'Ta bort',
+      danger: true,
+      onConfirm: async () => {
+        setApprovingId(user.id)
+        const { error } = await supabase.rpc('delete_member', { target_user_id: user.id })
+        if (error) {
+          alert('Kunde inte ta bort medlemmen: ' + error.message)
+        } else {
+          await fetchPendingUsers()
+        }
+        setApprovingId(null)
+        setConfirmDialog(null)
+      },
+    })
   }
 
   function exportMembersCSV() {
@@ -986,6 +1033,9 @@ export default function AdminPage() {
                     )}
                   </div>
                   <div className="text-xs text-slate-400 truncate">{u.email}{u.phone ? ` · ${u.phone}` : ''}</div>
+                  <div className={`text-[10px] mt-0.5 ${u.last_sign_in_at ? 'text-slate-400' : 'text-amber-500'}`}>
+                    {u.last_sign_in_at ? `Senast inloggad: ${formatLastSignIn(u.last_sign_in_at)}` : 'Aldrig inloggad'}
+                  </div>
                 </div>
                 <button
                   onClick={() => toggleAdmin(u.id, u.role)}
@@ -997,6 +1047,16 @@ export default function AdminPage() {
                 >
                   {u.role === 'admin' ? 'Ta bort admin' : 'Gör admin'}
                 </button>
+                {u.id !== profile?.id && (
+                  <button
+                    onClick={() => deleteMember(u)}
+                    disabled={approvingId === u.id}
+                    title="Ta bort medlem (anonymisera)"
+                    className="p-1.5 text-slate-400 hover:text-red-500 disabled:opacity-50 transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             ))
           )}
