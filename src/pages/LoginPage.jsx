@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [registered, setRegistered] = useState(false)
+  const [autoApproved, setAutoApproved] = useState(false)
   const [resetSent, setResetSent] = useState(false)
   const [form, setForm] = useState({
     email: '',
@@ -28,9 +29,12 @@ export default function LoginPage() {
     setLoading(true)
 
     if (isRegister) {
-      const { error } = await signUp(form)
+      const { error, autoApproved: approved } = await signUp(form)
       if (error) setError(error.message)
-      else setRegistered(true)
+      else {
+        setAutoApproved(!!approved)
+        setRegistered(true)
+      }
     } else {
       const { error } = await signIn({ email: form.email, password: form.password })
       if (error) setError(error.message)
@@ -70,15 +74,19 @@ export default function LoginPage() {
         <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           {registered ? (
             <div className="text-center py-4">
-              <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-50 rounded-2xl mb-3">
-                <Clock className="w-7 h-7 text-blue-500" />
+              <div className={`inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3 ${autoApproved ? 'bg-emerald-50' : 'bg-blue-50'}`}>
+                {autoApproved
+                  ? <ArrowRight className="w-7 h-7 text-emerald-500" />
+                  : <Clock className="w-7 h-7 text-blue-500" />}
               </div>
               <h2 className="text-lg font-semibold text-slate-800 mb-2">Konto skapat!</h2>
               <p className="text-sm text-slate-500">
-                Ditt konto väntar på godkännande av en admin. Du får tillgång så snart det är godkänt.
+                {autoApproved
+                  ? 'Din mejladress fanns på medlemslistan — du kan logga in direkt.'
+                  : 'Ditt konto väntar på godkännande av en admin. Du får tillgång så snart det är godkänt.'}
               </p>
               <button
-                onClick={() => { setRegistered(false); setIsRegister(false) }}
+                onClick={() => { setRegistered(false); setAutoApproved(false); setIsRegister(false) }}
                 className="mt-4 text-sm text-red-600 hover:text-red-700 transition-colors"
               >
                 Tillbaka till inloggning

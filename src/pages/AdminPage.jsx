@@ -9,7 +9,8 @@ import {
   GripVertical, Trophy, Users, AlertTriangle, Check, X, Shield, User,
   Download, CalendarDays, History, Plus, Wrench, Star, Trash2,
   CreditCard, CheckCircle2, Search, BarChart3, TrendingUp,
-  MessageSquare, Bug, Hammer, RotateCcw, ArrowRight, Pencil, Save, Mail, Phone
+  MessageSquare, Bug, Hammer, RotateCcw, ArrowRight, Pencil, Save, Mail, Phone,
+  Upload, MailCheck
 } from 'lucide-react'
 import {
   DndContext,
@@ -92,6 +93,10 @@ export default function AdminPage() {
   const [issues, setIssues] = useState([])
   const [issueFilter, setIssueFilter] = useState('open')
   const [issueResponse, setIssueResponse] = useState({ id: null, text: '' })
+  const [allowedEmails, setAllowedEmails] = useState([])
+  const [allowedEmailInput, setAllowedEmailInput] = useState('')
+  const [allowedEmailBusy, setAllowedEmailBusy] = useState(false)
+  const [allowedEmailMsg, setAllowedEmailMsg] = useState(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -108,7 +113,71 @@ export default function AdminPage() {
 
   useEffect(() => {
     fetchIssues()
+    fetchAllowedEmails()
   }, [])
+
+  async function fetchAllowedEmails() {
+    const { data } = await supabase
+      .from('allowed_emails')
+      .select('*')
+      .order('email')
+    setAllowedEmails(data || [])
+  }
+
+  async function addAllowedEmails(emails) {
+    const cleaned = Array.from(new Set(
+      emails
+        .map((e) => (e || '').trim().toLowerCase())
+        .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+    ))
+    if (cleaned.length === 0) {
+      setAllowedEmailMsg({ type: 'error', text: 'Inga giltiga mejladresser hittades.' })
+      return
+    }
+    setAllowedEmailBusy(true)
+    setAllowedEmailMsg(null)
+    const rows = cleaned.map((email) => ({ email, added_by: profile?.id ?? null }))
+    const { error } = await supabase
+      .from('allowed_emails')
+      .upsert(rows, { onConflict: 'email', ignoreDuplicates: true })
+    setAllowedEmailBusy(false)
+    if (error) {
+      setAllowedEmailMsg({ type: 'error', text: error.message })
+      return
+    }
+    await fetchAllowedEmails()
+    setAllowedEmailMsg({ type: 'success', text: `La till ${cleaned.length} mejladress${cleaned.length === 1 ? '' : 'er'}.` })
+  }
+
+  async function removeAllowedEmail(email) {
+    const { error } = await supabase.from('allowed_emails').delete().eq('email', email)
+    if (error) {
+      setAllowedEmailMsg({ type: 'error', text: error.message })
+      return
+    }
+    setAllowedEmails((prev) => prev.filter((r) => r.email !== email))
+  }
+
+  async function handleAllowedCsvUpload(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const text = await file.text()
+    const emails = text
+      .split(/[\r\n,;]+/)
+      .map((line) => {
+        const cell = line.split(/[,;\t]/)[0]
+        return cell.replace(/^"|"$/g, '').trim()
+      })
+      .filter(Boolean)
+    await addAllowedEmails(emails)
+  }
+
+  async function submitManualAllowedEmail() {
+    if (!allowedEmailInput.trim()) return
+    await addAllowedEmails([allowedEmailInput])
+    setAllowedEmailInput('')
+  }
 
   async function fetchIssues() {
     const { data } = await supabase
@@ -992,7 +1061,84 @@ export default function AdminPage() {
 
       {tab === 'members' && (
         <div className="space-y-3">
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Väntande godkännanden</h2>
+          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
+                <MailCheck className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-slate-700">Förgodkända mejladresser</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Konton som registreras med en mejl i listan godkänns automatiskt.
+                  Övriga hamnar som vanligt i kö för admin-godkännande.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <label className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors">
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
+                Importera CSV
+                <input type="file" accept=".csv,.txt" onChange={handleAllowedCsvUpload} className="hidden" />
+              </label>
+              <div className="flex-1 flex items-center gap-2 min-w-[180px]">
+                <input
+                  type="email"
+                  value={allowedEmailInput}
+                  onChange={(e) => setAllowedEmailInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && submitManualAllowedEmail()}
+                  placeholder="namn@exempel.se"
+                  className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-red-500/40 focus:border-red-500"
+                />
+                <button
+                  onClick={submitManualAllowedEmail}
+                  disabled={allowedEmailBusy || !allowedEmailInput.trim()}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+                >
+                  Lägg till
+                </button>
+              </div>
+            </div>
+
+            {allowedEmailMsg && (
+              <div className={`text-xs rounded-lg px-3 py-2 mb-3 ${
+                allowedEmailMsg.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-600'
+              }`}>
+                {allowedEmailMsg.text}
+              </div>
+            )}
+
+            {allowedEmails.length === 0 ? (
+              <div className="text-xs text-slate-400 text-center py-3 bg-slate-50 rounded-lg">
+                Inga mejladresser i listan ännu.
+              </div>
+            ) : (
+              <>
+                <div className="text-[11px] text-slate-400 mb-1.5">
+                  {allowedEmails.length} mejladress{allowedEmails.length === 1 ? '' : 'er'} i listan
+                </div>
+                <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                  {allowedEmails.map((row) => (
+                    <div key={row.email} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="text-xs text-slate-600 truncate flex-1">{row.email}</span>
+                      <button
+                        onClick={() => removeAllowedEmail(row.email)}
+                        className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                        title="Ta bort"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide pt-2">Väntande godkännanden</h2>
           {pendingUsers.length === 0 ? (
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center text-slate-400 text-xs">
               Inga väntande konton.

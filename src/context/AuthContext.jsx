@@ -51,22 +51,30 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) return { error }
 
-    const { error: profileError } = await supabase.from('users').insert({
-      id: data.user.id,
-      email,
-      name,
-      phone,
-      role: 'member',
-      approved: false,
-    })
+    const { data: inserted, error: profileError } = await supabase
+      .from('users')
+      .insert({
+        id: data.user.id,
+        email,
+        name,
+        phone,
+        role: 'member',
+        approved: false,
+      })
+      .select('approved')
+      .single()
     if (profileError) return { error: profileError }
 
-    // Notify admins about new account
-    supabase.functions.invoke('send-email', {
-      body: { type: 'new_account', userId: data.user.id },
-    })
+    const autoApproved = !!inserted?.approved
 
-    return { data }
+    // Mejla bara admins om kontot kräver manuellt godkännande
+    if (!autoApproved) {
+      supabase.functions.invoke('send-email', {
+        body: { type: 'new_account', userId: data.user.id },
+      })
+    }
+
+    return { data, autoApproved }
   }
 
   async function signIn({ email, password }) {
