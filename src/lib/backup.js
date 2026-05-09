@@ -52,7 +52,7 @@ export async function fetchBackupData(supabase) {
 export function bookingsToCsv(bookings) {
   const headers = [
     'Bokningsnr', 'Status', 'Namn', 'E-post', 'År', 'Vecka', 'Pris',
-    'Anmälningsavgift betald', 'Belopp', 'Påminnelser skickade',
+    'Anmälningsavgift betald', 'Belopp', 'Slutbetalning klar', 'Påminnelser skickade',
     'Skapad', 'Avbokad', 'Återbetalningsbar', 'Kommentar'
   ]
   const rows = bookings.map((b) => [
@@ -65,6 +65,7 @@ export function bookingsToCsv(bookings) {
     b.price,
     b.deposit_paid ? 'Ja' : 'Nej',
     b.deposit_amount || '',
+    b.final_paid ? 'Ja' : 'Nej',
     b.deposit_reminder_count || 0,
     b.created_at,
     b.cancelled_at || '',
