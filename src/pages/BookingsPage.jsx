@@ -247,6 +247,27 @@ export default function BookingsPage() {
                   </div>
                 )}
 
+                {(() => {
+                  const remaining = Math.max(0, (b.price || 0) - (b.deposit_amount || PAYMENT.depositAmount))
+                  if (remaining === 0) return null
+                  return b.final_paid ? (
+                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-xs text-emerald-700">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      Slutbetalning {remaining.toLocaleString('sv-SE')} kr betald
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 space-y-1">
+                      <div className="flex items-center gap-2 text-xs text-slate-700 font-medium">
+                        <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                        Slutbetalning {remaining.toLocaleString('sv-SE')} kr — ej betald
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Plusgiro: <strong>{PAYMENT.plusgiro}</strong> ({PAYMENT.payee}) · Meddelande: <strong>{reference}</strong>
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {editingNoteId === b.id ? (
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-2">
                     <textarea
@@ -370,19 +391,24 @@ export default function BookingsPage() {
                 </div>
               </div>
 
-              {cancelTarget.deposit_paid && (
-                refundable ? (
+              {(cancelTarget.deposit_paid || cancelTarget.final_paid) && (() => {
+                const remaining = Math.max(0, (cancelTarget.price || 0) - (cancelTarget.deposit_amount || PAYMENT.depositAmount))
+                const parts = []
+                if (cancelTarget.deposit_paid) parts.push(`anmälningsavgiften (${cancelTarget.deposit_amount || PAYMENT.depositAmount} kr)`)
+                if (cancelTarget.final_paid && remaining > 0) parts.push(`slutbetalningen (${remaining.toLocaleString('sv-SE')} kr)`)
+                const label = parts.join(' och ')
+                return refundable ? (
                   <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-700">
                     Det är mer än {REFUND_DEADLINE_WEEKS} veckor till incheckning —
-                    <strong> anmälningsavgiften ({cancelTarget.deposit_amount || PAYMENT.depositAmount} kr) återbetalas.</strong>
+                    <strong> {label} återbetalas.</strong>
                   </div>
                 ) : (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
                     <strong>OBS:</strong> Det är mindre än {REFUND_DEADLINE_WEEKS} veckor till incheckning —
-                    anmälningsavgiften ({cancelTarget.deposit_amount || PAYMENT.depositAmount} kr) <strong>återbetalas inte</strong>.
+                    {' '}{label} <strong>återbetalas inte</strong>.
                   </div>
                 )
-              )}
+              })()}
 
               <div className="flex gap-2">
                 <button

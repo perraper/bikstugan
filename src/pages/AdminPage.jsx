@@ -591,6 +591,10 @@ export default function AdminPage() {
     (b) => b.status === 'cancelled' && b.deposit_paid && b.deposit_refundable === true
   )
 
+  const finalRefundsPending = allBookings.filter(
+    (b) => b.status === 'cancelled' && b.final_paid && b.final_refundable === true && finalRemaining(b) > 0
+  )
+
   const filteredIssues = useMemo(() => {
     if (issueFilter === 'all') return issues
     return issues.filter((i) => i.status === issueFilter)
@@ -603,6 +607,16 @@ export default function AdminPage() {
       .eq('id', booking.id)
     setAllBookings((prev) => prev.map((b) =>
       b.id === booking.id ? { ...b, deposit_refundable: false, deposit_paid: false } : b
+    ))
+  }
+
+  async function markFinalRefunded(booking) {
+    await supabase
+      .from('bookings')
+      .update({ final_refundable: false, final_paid: false })
+      .eq('id', booking.id)
+    setAllBookings((prev) => prev.map((b) =>
+      b.id === booking.id ? { ...b, final_refundable: false, final_paid: false } : b
     ))
   }
 
@@ -736,33 +750,48 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {refundsPending.length > 0 && (
+          {(refundsPending.length > 0 || finalRefundsPending.length > 0) && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
               <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
                 <RotateCcw className="w-4 h-4" />
-                Återbetalningar att hantera ({refundsPending.length})
+                Återbetalningar att hantera ({refundsPending.length + finalRefundsPending.length})
               </div>
-              {refundsPending.map((b) => {
-                const dates = getWeekDateRange(b.year, b.week_number)
-                return (
-                  <div key={b.id} className="bg-white border border-blue-100 rounded-lg p-3 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-slate-700 truncate">
-                        V{b.week_number} · {b.user?.name || 'Okänd'}
-                      </div>
-                      <div className="text-[11px] text-slate-400">
-                        Avbokad {b.cancelled_at ? new Date(b.cancelled_at).toLocaleDateString('sv-SE') : ''} · {b.deposit_amount || PAYMENT.depositAmount} kr ska återbetalas
-                      </div>
+              {refundsPending.map((b) => (
+                <div key={`dep-${b.id}`} className="bg-white border border-blue-100 rounded-lg p-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-700 truncate">
+                      V{b.week_number} · {b.user?.name || 'Okänd'} · <span className="text-blue-700">anm.avg</span>
                     </div>
-                    <button
-                      onClick={() => markRefunded(b)}
-                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium shrink-0"
-                    >
-                      Återbetalad
-                    </button>
+                    <div className="text-[11px] text-slate-400">
+                      Avbokad {b.cancelled_at ? new Date(b.cancelled_at).toLocaleDateString('sv-SE') : ''} · {b.deposit_amount || PAYMENT.depositAmount} kr ska återbetalas
+                    </div>
                   </div>
-                )
-              })}
+                  <button
+                    onClick={() => markRefunded(b)}
+                    className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium shrink-0"
+                  >
+                    Återbetalad
+                  </button>
+                </div>
+              ))}
+              {finalRefundsPending.map((b) => (
+                <div key={`fin-${b.id}`} className="bg-white border border-blue-100 rounded-lg p-3 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-700 truncate">
+                      V{b.week_number} · {b.user?.name || 'Okänd'} · <span className="text-blue-700">slutbet.</span>
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      Avbokad {b.cancelled_at ? new Date(b.cancelled_at).toLocaleDateString('sv-SE') : ''} · {finalRemaining(b).toLocaleString('sv-SE')} kr ska återbetalas
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => markFinalRefunded(b)}
+                    className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-medium shrink-0"
+                  >
+                    Återbetalad
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 

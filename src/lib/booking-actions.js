@@ -68,6 +68,7 @@ export async function cancelBooking({ profile, booking }) {
       status: 'cancelled',
       cancelled_at: new Date().toISOString(),
       deposit_refundable: refundable,
+      final_refundable: refundable,
     })
     .eq('id', booking.id)
 

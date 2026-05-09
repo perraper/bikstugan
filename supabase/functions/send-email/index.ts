@@ -28,7 +28,7 @@ function paymentReference(name: string, year: number, weekNumber: number) {
 }
 
 interface EmailPayload {
-  type: 'booking_confirmation' | 'welcome' | 'cancellation_offer' | 'lottery_result' | 'new_account' | 'booking_cancelled' | 'booking_admin_notify' | 'deposit_reminder' | 'issue_created'
+  type: 'booking_confirmation' | 'welcome' | 'cancellation_offer' | 'lottery_result' | 'new_account' | 'booking_cancelled' | 'booking_admin_notify' | 'deposit_reminder' | 'final_reminder' | 'issue_created'
   userId: string
   weekNumber?: number
   year?: number
@@ -276,6 +276,37 @@ Deno.serve(async (req) => {
           ${isFinal
             ? '<p style="color:#a16207;background:#fef3c7;padding:8px 12px;border-radius:6px"><strong>Detta är sista påminnelsen.</strong> Om betalningen inte syns inom kort kan bokningen komma att annulleras.</p>'
             : '<p>Var god betala så snart som möjligt för att säkra bokningen.</p>'
+          }
+          <p style="color:#888;font-size:13px">Om du redan har betalat — bortse från detta mejl, det kan ta några dagar innan vi registrerat betalningen.</p>
+          <p>Mvh, BIK-stugan</p>
+          `
+        )
+        break
+      }
+
+      case 'final_reminder': {
+        const reminderCount = (payload.extra?.reminderCount as number) || 1
+        const remaining = (payload.extra?.remaining as number) || 0
+        const reference = paymentReference(user.name, year!, weekNumber!)
+        const dates = getWeekDates(year!, weekNumber!)
+        const isFinal = reminderCount >= 2
+        await sendEmail(
+          user.email,
+          isFinal
+            ? `Sista påminnelse — slutbetalning v${weekNumber}`
+            : `Påminnelse — slutbetalning v${weekNumber}`,
+          `
+          <h2>Hej ${user.name}!</h2>
+          <p>Vi har inte registrerat din slutbetalning för bokning vecka <strong>${weekNumber}</strong>, ${year} (incheckning ${dates.checkIn}).</p>
+          <table style="border-collapse:collapse;margin:8px 0">
+            <tr><td style="padding:4px 12px 4px 0;color:#888">Plusgiro:</td><td style="padding:4px 0"><strong>${PAYMENT.plusgiro}</strong></td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#888">Mottagare:</td><td style="padding:4px 0"><strong>${PAYMENT.payee}</strong></td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#888">Belopp:</td><td style="padding:4px 0"><strong>${remaining} kr</strong></td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#888">Meddelande:</td><td style="padding:4px 0"><strong>${reference}</strong></td></tr>
+          </table>
+          ${isFinal
+            ? '<p style="color:#a16207;background:#fef3c7;padding:8px 12px;border-radius:6px"><strong>Detta är sista påminnelsen.</strong> Slutbetalningen ska vara registrerad innan ankomst.</p>'
+            : '<p>Var god slutför betalningen senast en vecka före ankomst.</p>'
           }
           <p style="color:#888;font-size:13px">Om du redan har betalat — bortse från detta mejl, det kan ta några dagar innan vi registrerat betalningen.</p>
           <p>Mvh, BIK-stugan</p>

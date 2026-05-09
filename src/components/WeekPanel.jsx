@@ -621,6 +621,29 @@ function BookedSection({
             </div>
           )}
 
+          {(() => {
+            const remaining = Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount))
+            if (remaining === 0) return null
+            return booking.final_paid ? (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-xs text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                Slutbetalning {remaining.toLocaleString('sv-SE')} kr betald
+              </div>
+            ) : (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm text-slate-700 font-medium">
+                  <CreditCard className="w-4 h-4" />
+                  Slutbetalning {remaining.toLocaleString('sv-SE')} kr — ej betald
+                </div>
+                <div className="space-y-1 bg-white rounded-md p-2 border border-slate-200">
+                  <PaymentRow label="Plusgiro" value={PAYMENT.plusgiro} field="pg-final" copied={copiedField} onCopy={onCopy} />
+                  <PaymentRow label="Belopp" value={`${remaining.toLocaleString('sv-SE')} kr`} field="amount-final" copied={copiedField} onCopy={onCopy} />
+                  <PaymentRow label="Meddelande" value={paymentRef} field="ref-final" copied={copiedField} onCopy={onCopy} />
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Egen kommentar */}
           {editingNote ? (
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-2">
@@ -763,19 +786,24 @@ function CancelConfirm({ booking, onCancel, onConfirm, loading }) {
         </div>
       </div>
 
-      {booking.deposit_paid && (
-        refundable ? (
+      {(booking.deposit_paid || booking.final_paid) && (() => {
+        const remaining = Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount))
+        const parts = []
+        if (booking.deposit_paid) parts.push(`anmälningsavgiften (${booking.deposit_amount || PAYMENT.depositAmount} kr)`)
+        if (booking.final_paid && remaining > 0) parts.push(`slutbetalningen (${remaining.toLocaleString('sv-SE')} kr)`)
+        const label = parts.join(' och ')
+        return refundable ? (
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-700">
             Det är mer än {REFUND_DEADLINE_WEEKS} veckor till incheckning —
-            <strong> anmälningsavgiften ({booking.deposit_amount || PAYMENT.depositAmount} kr) återbetalas.</strong>
+            <strong> {label} återbetalas.</strong>
           </div>
         ) : (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
             <strong>OBS:</strong> Det är mindre än {REFUND_DEADLINE_WEEKS} veckor till incheckning —
-            anmälningsavgiften <strong>återbetalas inte</strong>.
+            {' '}{label} <strong>återbetalas inte</strong>.
           </div>
         )
-      )}
+      })()}
 
       <div className="flex gap-2">
         <button onClick={onCancel} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg px-4 py-2.5 text-sm transition-colors">
