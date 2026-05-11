@@ -348,6 +348,11 @@ export default function AdminPage() {
   }
 
   async function fetchPendingUsers() {
+    // delete_member anonymiserar (email → deleted-<uuid>@deleted.local) men raden
+    // ligger kvar för att bevara bokningshistorik. Filtrera bort dem från admin-listorna
+    // så de inte dyker upp som "väntar på godkännande" igen.
+    const isDeleted = (u) => u.email?.endsWith('@deleted.local')
+
     const { data, error } = await supabase.rpc('get_admin_users_with_auth')
     if (error) {
       console.error(error)
@@ -356,11 +361,11 @@ export default function AdminPage() {
         supabase.from('users').select('*').eq('approved', false).order('created_at', { ascending: true }),
         supabase.from('users').select('*').eq('approved', true).order('name'),
       ])
-      setPendingUsers(pending || [])
-      setAllUsers(all || [])
+      setPendingUsers((pending || []).filter((u) => !isDeleted(u)))
+      setAllUsers((all || []).filter((u) => !isDeleted(u)))
       return
     }
-    const rows = data || []
+    const rows = (data || []).filter((u) => !isDeleted(u))
     setPendingUsers(rows.filter((u) => !u.approved).sort((a, b) => new Date(a.created_at) - new Date(b.created_at)))
     setAllUsers(rows.filter((u) => u.approved).sort((a, b) => {
       if (a.role !== b.role) return a.role === 'admin' ? -1 : 1
