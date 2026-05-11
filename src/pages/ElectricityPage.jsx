@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Zap, Calculator, ArrowRight } from 'lucide-react'
+import { PAYMENT } from '../lib/config'
 
 const PRICE_PER_KWH = 2.5
 
@@ -32,7 +33,7 @@ export default function ElectricityPage() {
             <li>Läs av elmätaren vid incheckning (lördag 12:00)</li>
             <li>Läs av igen vid utcheckning (lördag 12:00)</li>
             <li>Mata in värdena nedan</li>
-            <li>Swisha beloppet till föreningen</li>
+            <li>Betala beloppet till föreningens plusgiro</li>
           </ol>
         </div>
 
@@ -73,7 +74,12 @@ export default function ElectricityPage() {
             <div className="text-4xl font-bold text-amber-600">
               {cost.toFixed(0)} kr
             </div>
-            <p className="text-xs text-slate-400">Swisha detta belopp till föreningen</p>
+            <div className="text-xs text-slate-500 pt-1 space-y-0.5">
+              <div>
+                Betala till plusgiro <strong className="text-slate-700">{PAYMENT.plusgiro}</strong> ({PAYMENT.payee})
+              </div>
+              <div className="text-slate-400">Tyvärr ingen Swish än.</div>
+            </div>
           </div>
         )}
       </div>
