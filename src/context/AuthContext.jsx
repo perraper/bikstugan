@@ -68,7 +68,6 @@ export function AuthProvider({ children }) {
       .single()
     if (profileError) return { error: profileError }
 
-    setProfile(inserted)
     const autoApproved = !!inserted?.approved
 
     // Mejla bara admins om kontot kräver manuellt godkännande
@@ -76,6 +75,14 @@ export function AuthProvider({ children }) {
       supabase.functions.invoke('send-email', {
         body: { type: 'new_account', userId: data.user.id },
       })
+    }
+
+    if (autoApproved) {
+      // Auto-godkänd: behåll session så användaren går direkt till kalendern.
+      setProfile(inserted)
+    } else {
+      // Inte godkänd än: logga ut så LoginPage kan visa "Konto skapat — väntar på godkännande".
+      await supabase.auth.signOut()
     }
 
     return { data, autoApproved }
