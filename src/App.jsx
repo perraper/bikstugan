@@ -50,7 +50,8 @@ function ProtectedRoute({ children }) {
   if (loading) return <Loading />
   if (isPasswordRecovery) return <Navigate to="/reset-password" />
   if (!user) return <Navigate to="/login" />
-  if (profile && !profile.approved) return <PendingApproval />
+  if (!profile) return <Loading />
+  if (!profile.approved) return <PendingApproval />
   return children
 }
 

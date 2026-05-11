@@ -43,7 +43,10 @@ export function AuthProvider({ children }) {
       .select('*')
       .eq('id', userId)
       .single()
-    setProfile(data)
+    // Skriv inte över befintlig profil med null. Vid signup hinner auth-state
+    // skicka SIGNED_IN innan vi insertar users-raden — då får fetchProfile
+    // tomt svar, men signUp() sätter profilen direkt efter insert.
+    if (data) setProfile(data)
     setLoading(false)
   }
 
@@ -61,10 +64,11 @@ export function AuthProvider({ children }) {
         role: 'member',
         approved: false,
       })
-      .select('approved')
+      .select('*')
       .single()
     if (profileError) return { error: profileError }
 
+    setProfile(inserted)
     const autoApproved = !!inserted?.approved
 
     // Mejla bara admins om kontot kräver manuellt godkännande
