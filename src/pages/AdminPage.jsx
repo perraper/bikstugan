@@ -11,7 +11,7 @@ import {
   Download, CalendarDays, History, Plus, Wrench, Star, Trash2,
   CreditCard, CheckCircle2, Search, BarChart3, TrendingUp,
   MessageSquare, Bug, Hammer, RotateCcw, ArrowRight, Pencil, Save, Mail, Phone,
-  Upload, MailCheck
+  Upload, MailCheck, Zap
 } from 'lucide-react'
 import {
   DndContext,
@@ -296,7 +296,17 @@ export default function AdminPage() {
       .select('*, user:users(name, email)')
       .eq('year', year)
       .order('week_number')
-    setAllBookings(bookingData || [])
+
+    const ids = (bookingData || []).map((b) => b.id)
+    let readingMap = {}
+    if (ids.length) {
+      const { data: readingData } = await supabase
+        .from('electricity_readings')
+        .select('booking_id, start_kwh, end_kwh, cost')
+        .in('booking_id', ids)
+      for (const r of readingData || []) readingMap[r.booking_id] = r
+    }
+    setAllBookings((bookingData || []).map((b) => ({ ...b, electricity: readingMap[b.id] || null })))
 
     setLoading(false)
   }
@@ -479,7 +489,17 @@ export default function AdminPage() {
       .eq('user_id', user.id)
       .order('year', { ascending: false })
       .order('week_number', { ascending: false })
-    setMemberBookings(data || [])
+
+    const ids = (data || []).map((b) => b.id)
+    let readingMap = {}
+    if (ids.length) {
+      const { data: readingData } = await supabase
+        .from('electricity_readings')
+        .select('booking_id, start_kwh, end_kwh, cost')
+        .in('booking_id', ids)
+      for (const r of readingData || []) readingMap[r.booking_id] = r
+    }
+    setMemberBookings((data || []).map((b) => ({ ...b, electricity: readingMap[b.id] || null })))
   }
 
   function startEditMember() {
@@ -1021,6 +1041,19 @@ export default function AdminPage() {
                         </button>
                       </div>
                     </div>
+                    {b.electricity && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50/80 border border-amber-100 rounded px-2 py-1">
+                        <Zap className="w-3 h-3 shrink-0" />
+                        {b.electricity.end_kwh != null ? (
+                          <span>
+                            El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ({Math.max(0, b.electricity.end_kwh - b.electricity.start_kwh)} kWh) ·{' '}
+                            <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
+                          </span>
+                        ) : (
+                          <span>El påbörjad: {b.electricity.start_kwh} kWh (slutavläsning saknas)</span>
+                        )}
+                      </div>
+                    )}
                     {b.note && (
                       <div className="mt-2 flex items-start gap-1.5 text-[11px] text-slate-500 bg-white/60 rounded px-2 py-1">
                         <MessageSquare className="w-3 h-3 mt-0.5 shrink-0" />
@@ -1907,19 +1940,34 @@ export default function AdminPage() {
                 {memberBookings.map((b) => {
                   const dates = getWeekDateRange(b.year, b.week_number)
                   return (
-                    <div key={b.id} className={`border rounded-lg px-3 py-2 flex items-center justify-between ${
+                    <div key={b.id} className={`border rounded-lg px-3 py-2 space-y-1 ${
                       b.status === 'confirmed' ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'
                     }`}>
-                      <div>
-                        <div className="text-sm font-medium text-slate-700">V{b.week_number}, {b.year}</div>
-                        <div className="text-xs text-slate-400">{formatDateShort(dates.checkIn)} – {formatDateShort(dates.checkOut)}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-slate-600">{b.price} kr</div>
-                        <div className={`text-xs ${b.status === 'confirmed' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {b.status === 'confirmed' ? 'Bekräftad' : b.status === 'cancelled' ? 'Avbokad' : b.status}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium text-slate-700">V{b.week_number}, {b.year}</div>
+                          <div className="text-xs text-slate-400">{formatDateShort(dates.checkIn)} – {formatDateShort(dates.checkOut)}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-slate-600">{b.price} kr</div>
+                          <div className={`text-xs ${b.status === 'confirmed' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {b.status === 'confirmed' ? 'Bekräftad' : b.status === 'cancelled' ? 'Avbokad' : b.status}
+                          </div>
                         </div>
                       </div>
+                      {b.electricity && (
+                        <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
+                          <Zap className="w-3 h-3 shrink-0" />
+                          {b.electricity.end_kwh != null ? (
+                            <span>
+                              El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ·{' '}
+                              <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
+                            </span>
+                          ) : (
+                            <span>El påbörjad: {b.electricity.start_kwh} kWh</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
