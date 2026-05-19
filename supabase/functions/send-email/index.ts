@@ -117,7 +117,10 @@ Deno.serve(async (req) => {
       }
 
       case 'welcome': {
-        const portkod = payload.extra?.portkod || '1234'
+        // Portkoden läses från env-variabeln GATE_CODE (sätts via
+        // `supabase secrets set GATE_CODE=...`). payload.extra.portkod
+        // är override för manuella testanrop.
+        const portkod = payload.extra?.portkod || Deno.env.get('GATE_CODE') || '(saknas — kontakta admin)'
         const welcomeDates = getWeekDates(year!, weekNumber!)
         await sendEmail(
           user.email,
@@ -134,7 +137,7 @@ Deno.serve(async (req) => {
             <li>Ingen WiFi tillgänglig</li>
             <li>Läs av elmätaren vid ankomst och avfärd</li>
             <li>Städa stugan innan avfärd</li>
-            <li>El debiteras extra: 2,50 kr/kWh via Swish</li>
+            <li>El debiteras extra: 2,50 kr/kWh — betalas till plusgiro <strong>${PAYMENT.plusgiro}</strong> (${PAYMENT.payee})</li>
           </ul>
           <p>Ha en fin vistelse!</p>
           <p>Mvh, BIK-stugan</p>
