@@ -90,6 +90,37 @@ export default function CalendarPage() {
     fetchOwnBookings()
   }, [year, profile])
 
+  // Realtime: lyssna på ändringar i alla relevanta tabeller för året
+  // och uppdatera vyn automatiskt. Debounce 500ms så en serie ändringar
+  // (t.ex. avbokning → reserveerbjudande → reservuppdatering) batchas
+  // till en enda refetch.
+  useEffect(() => {
+    let timer = null
+    const triggerRefetch = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        fetchWeeks()
+        fetchLegacy()
+        fetchLotteryApps()
+        fetchOwnBookings()
+      }, 500)
+    }
+
+    const filter = `year=eq.${year}`
+    const channel = supabase
+      .channel(`calendar-${year}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'weeks', filter }, triggerRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter }, triggerRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'legacy_bookings', filter }, triggerRefetch)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lottery_applications', filter }, triggerRefetch)
+      .subscribe()
+
+    return () => {
+      if (timer) clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
+  }, [year])
+
   useEffect(() => {
     if (!loading && year === today.year && currentWeekRef.current) {
       currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
