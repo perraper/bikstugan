@@ -8,6 +8,7 @@ import { bookingsToIcs, downloadIcs } from '../lib/ical'
 import { CalendarCheck, Clock, Users, Ticket, Download, CreditCard, CheckCircle2, MessageSquare, Pencil, Save } from 'lucide-react'
 import Spinner from '../components/Spinner'
 import CancelBookingConfirm from '../components/CancelBookingConfirm'
+import CountdownBadge from '../components/CountdownBadge'
 
 export default function BookingsPage() {
   const { profile } = useAuth()
@@ -224,7 +225,10 @@ export default function BookingsPage() {
                       <div className="text-sm font-medium text-slate-700">
                         {formatDateLong(dates.checkIn)} – {formatDateLong(dates.checkOut)}, {b.year}
                       </div>
-                      <div className="text-xs text-slate-400">{season.label} · {b.price} kr</div>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        <span className="text-xs text-slate-400">{season.label} · {b.price} kr</span>
+                        <CountdownBadge checkIn={dates.checkIn} checkOut={dates.checkOut} />
+                      </div>
                     </div>
                   </div>
                   <button
