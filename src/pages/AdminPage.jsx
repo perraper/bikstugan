@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear } from '../lib/weeks'
-import { PAYMENT, REFUND_DEADLINE_WEEKS } from '../lib/config'
+import { PAYMENT } from '../lib/config'
 import { downloadCsv, downloadJson, fetchBackupData, bookingsToCsv } from '../lib/backup'
 import { logAdminAction } from '../lib/audit'
 import {
