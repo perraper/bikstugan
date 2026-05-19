@@ -378,12 +378,10 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
                   canSeeBookerName={canSeeBookerName}
                   bookerName={bookerName}
                   booking={booking}
-                  profile={profile}
                   reserveCount={reserves.length}
                   ownReserve={ownReserve}
                   ownReserveRank={ownLotteryApp?.reserve_rank}
                   activeOffer={activeOffer}
-                  loading={loading}
                   actionLoading={actionLoading}
                   editingNote={editingNote}
                   noteDraft={noteDraft}
@@ -563,8 +561,8 @@ function LotterySection({ season, applied, loading, onApply }) {
 }
 
 function BookedSection({
-  isOwnBooking, isOthersBooking, isLegacy, canSeeBookerName, bookerName, booking, profile,
-  reserveCount, ownReserve, ownReserveRank, activeOffer, loading, actionLoading,
+  isOwnBooking, isOthersBooking, isLegacy, canSeeBookerName, bookerName, booking,
+  reserveCount, ownReserve, ownReserveRank, activeOffer, actionLoading,
   editingNote, noteDraft, setEditingNote, setNoteDraft, onSaveNote, onCancelBooking,
   onJoinReserve, onLeaveReserve, copiedField, onCopy, paymentRef,
 }) {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { getSeasonPrice, getWeekDateRange, formatDateShort, formatDateLong, getWeeksForYear } from '../lib/weeks'
+import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear } from '../lib/weeks'
 import { PAYMENT, REFUND_DEADLINE_WEEKS } from '../lib/config'
 import { downloadCsv, downloadJson, fetchBackupData, bookingsToCsv } from '../lib/backup'
 import { logAdminAction } from '../lib/audit'
@@ -123,7 +123,6 @@ export default function AdminPage() {
   const [weeks, setWeeks] = useState([])
   const [lotteryWeeks, setLotteryWeeks] = useState([])
   const [draftResults, setDraftResults] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [tab, setTab] = useState('payments')
