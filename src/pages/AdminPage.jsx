@@ -28,6 +28,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import Spinner from '../components/Spinner'
 
 const AUDIT_LABELS = {
   'booking.toggle_deposit_paid':  { label: 'Anmälningsavgift', tone: 'emerald' },
@@ -1230,7 +1231,7 @@ export default function AdminPage() {
                 className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-medium rounded-lg px-6 py-3 text-sm flex items-center justify-center gap-2 transition-colors"
               >
                 {generating ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <Spinner />
                 ) : (
                   <>
                     <Shuffle className="w-4 h-4" />
@@ -1263,7 +1264,7 @@ export default function AdminPage() {
                     className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm flex items-center justify-center gap-1 transition-colors"
                   >
                     {publishing ? (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <Spinner />
                     ) : (
                       <>
                         <Send className="w-4 h-4" />
@@ -1910,7 +1911,7 @@ export default function AdminPage() {
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2 text-sm flex items-center justify-center gap-2 transition-colors"
                 >
                   {savingEdit ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Spinner />
                   ) : (
                     <>
                       <Save className="w-4 h-4" />

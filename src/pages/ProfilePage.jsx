@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { User, Mail, Phone, Save, Check } from 'lucide-react'
+import Spinner from '../components/Spinner'
 
 export default function ProfilePage() {
   const { profile, signOut, refreshProfile } = useAuth()
@@ -68,7 +69,7 @@ export default function ProfilePage() {
           className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm flex items-center justify-center gap-2 transition-colors"
         >
           {saving ? (
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <Spinner />
           ) : saved ? (
             <>
               <Check className="w-4 h-4" />

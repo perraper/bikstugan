@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { Bug, Plus, Send, Check, Clock, Hammer, AlertTriangle } from 'lucide-react'
+import Spinner from '../components/Spinner'
 
 const STATUS_CONFIG = {
   open:        { bg: 'bg-red-50',     border: 'border-red-200',     text: 'text-red-700',     icon: AlertTriangle, label: 'Öppet' },
@@ -119,7 +120,7 @@ export default function IssuesPage() {
               className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium rounded-lg py-2 text-sm flex items-center justify-center gap-1.5 transition-colors"
             >
               {submitting ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Spinner />
               ) : (
                 <>
                   <Send className="w-4 h-4" />

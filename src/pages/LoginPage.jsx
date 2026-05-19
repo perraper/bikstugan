@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { Home, Mail, Lock, User, Phone, ArrowRight, Clock } from 'lucide-react'
+import Spinner from '../components/Spinner'
 
 export default function LoginPage() {
   const { signIn, signUp } = useAuth()
@@ -130,7 +131,7 @@ export default function LoginPage() {
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-3 text-sm flex items-center justify-center gap-2 transition-colors"
                 >
                   {loading ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Spinner />
                   ) : (
                     <>
                       Skicka återställningslänk
@@ -191,7 +192,7 @@ export default function LoginPage() {
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-3 text-sm flex items-center justify-center gap-2 transition-colors"
                 >
                   {loading ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Spinner />
                   ) : (
                     <>
                       {isRegister ? 'Skapa konto' : 'Logga in'}

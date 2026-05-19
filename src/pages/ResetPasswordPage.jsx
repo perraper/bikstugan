@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { Home, Lock, ArrowRight, CheckCircle2 } from 'lucide-react'
+import Spinner from '../components/Spinner'
 
 export default function ResetPasswordPage() {
   const { clearPasswordRecovery } = useAuth()
@@ -106,7 +107,7 @@ export default function ResetPasswordPage() {
                   className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-3 text-sm flex items-center justify-center gap-2 transition-colors"
                 >
                   {loading ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <Spinner />
                   ) : (
                     <>
                       Spara nytt lösenord

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getWeekDateRange, formatDateShort } from '../lib/weeks'
 import { PAYMENT } from '../lib/config'
+import Spinner from '../components/Spinner'
 
 const PRICE_PER_KWH = 2.5
 
@@ -248,7 +249,7 @@ export default function ElectricityPage() {
             className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm flex items-center justify-center gap-2 transition-colors"
           >
             {saving ? (
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <Spinner />
             ) : savedAt ? (
               <>
                 <CheckCircle2 className="w-4 h-4" />
