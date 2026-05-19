@@ -54,20 +54,34 @@ export default function BookingsPage() {
     setReserveOffers(offerData || [])
 
     if (bookingData?.length) {
+      // Hämta alla grannar i en enda query per år istället för en per bokning.
+      const yearGroups = new Map()
+      for (const b of bookingData) {
+        const set = yearGroups.get(b.year) ?? new Set()
+        set.add(b.week_number - 1)
+        set.add(b.week_number + 1)
+        yearGroups.set(b.year, set)
+      }
+      const yearWeeks = await Promise.all(
+        Array.from(yearGroups.entries()).map(([year, weeks]) =>
+          supabase
+            .from('weeks')
+            .select('year, week_number, booked_by:users(name, phone)')
+            .eq('year', year)
+            .eq('status', 'booked')
+            .in('week_number', Array.from(weeks))
+            .then(({ data }) => data || [])
+        )
+      )
+      const lookup = new Map()
+      for (const rows of yearWeeks) {
+        for (const w of rows) lookup.set(`${w.year}-${w.week_number}`, w.booked_by)
+      }
       const neighborMap = {}
       for (const b of bookingData) {
-        const prevWeek = b.week_number - 1
-        const nextWeek = b.week_number + 1
-        const { data: adjacentWeeks } = await supabase
-          .from('weeks')
-          .select('week_number, booked_by:users(name, phone)')
-          .eq('year', b.year)
-          .eq('status', 'booked')
-          .in('week_number', [prevWeek, nextWeek])
-
         neighborMap[`${b.year}-${b.week_number}`] = {
-          before: adjacentWeeks?.find((w) => w.week_number === prevWeek)?.booked_by,
-          after: adjacentWeeks?.find((w) => w.week_number === nextWeek)?.booked_by,
+          before: lookup.get(`${b.year}-${b.week_number - 1}`),
+          after: lookup.get(`${b.year}-${b.week_number + 1}`),
         }
       }
       setNeighbors(neighborMap)

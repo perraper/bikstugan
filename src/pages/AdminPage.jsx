@@ -468,14 +468,7 @@ export default function AdminPage() {
   function exportMembersCSV() {
     const headers = ['Namn', 'E-post', 'Telefon', 'Roll']
     const rows = allUsers.map((u) => [u.name, u.email, u.phone || '', u.role])
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `medlemmar-${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(`medlemmar-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows)
   }
 
   async function showMemberBookings(user) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { getSeasonPrice, getWeekDateRange, formatDateLong, formatDateShort, getBookingPeriod, isLotteryPassed, formatLotteryDate } from '../lib/weeks'
@@ -1241,11 +1241,14 @@ function LegacyBlock({
 }
 
 function HistorySection({ open, setOpen, weekNumber, history }) {
-  // Visa endast slutförda veckor — checkOut < idag.
-  const now = Date.now()
-  const sorted = [...history]
-    .filter((row) => getWeekDateRange(row.year, weekNumber).checkOut.getTime() < now)
-    .sort((a, b) => b.year - a.year)
+  // Visa endast slutförda veckor — checkOut < idag. useMemo undviker att
+  // Date.now() anropas i render (bryter React 19s purity-regel).
+  const sorted = useMemo(() => {
+    const now = Date.now()
+    return [...history]
+      .filter((row) => getWeekDateRange(row.year, weekNumber).checkOut.getTime() < now)
+      .sort((a, b) => b.year - a.year)
+  }, [history, weekNumber])
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
       <button
