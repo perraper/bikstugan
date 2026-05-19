@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { Home, CalendarDays, Zap, Settings, Menu, X, User, Bug } from 'lucide-react'
 import { useState } from 'react'
 
@@ -15,7 +15,7 @@ const adminLinks = [
 ]
 
 export default function Layout() {
-  const { profile, signOut } = useAuth()
+  const { profile } = useAuth()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 

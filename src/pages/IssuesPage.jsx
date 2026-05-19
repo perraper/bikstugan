@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { Bug, Plus, Send, Check, Clock, Hammer, AlertTriangle } from 'lucide-react'
 
 const STATUS_CONFIG = {
@@ -17,10 +17,6 @@ export default function IssuesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({ title: '', description: '' })
 
-  useEffect(() => {
-    fetchIssues()
-  }, [])
-
   async function fetchIssues() {
     setLoading(true)
     const { data } = await supabase
@@ -30,6 +26,10 @@ export default function IssuesPage() {
     setIssues(data || [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    fetchIssues()
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()

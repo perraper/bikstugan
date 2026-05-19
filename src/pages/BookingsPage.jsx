@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
-import { getWeekDateRange, formatDateShort, formatDateLong, getSeasonPrice } from '../lib/weeks'
+import { useAuth } from '../context/useAuth'
+import { getWeekDateRange, formatDateLong, getSeasonPrice } from '../lib/weeks'
 import { PAYMENT, REFUND_DEADLINE_WEEKS, paymentReference } from '../lib/config'
 import { cancelBooking, acceptReserveOffer, weeksUntilCheckin } from '../lib/booking-actions'
 import { bookingsToIcs, downloadIcs } from '../lib/ical'
@@ -19,10 +19,6 @@ export default function BookingsPage() {
   const [acceptingOffer, setAcceptingOffer] = useState(null)
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [noteDraft, setNoteDraft] = useState('')
-
-  useEffect(() => {
-    fetchData()
-  }, [profile])
 
   async function fetchData() {
     if (!profile) return
@@ -89,6 +85,10 @@ export default function BookingsPage() {
 
     setLoading(false)
   }
+
+  useEffect(() => {
+    fetchData()
+  }, [profile])
 
   async function handleCancel(booking) {
     setCancelling(true)

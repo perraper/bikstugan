@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateLong, formatDateShort, getBookingPeriod, isLotteryPassed, formatLotteryDate } from '../lib/weeks'
 import { PAYMENT, REFUND_DEADLINE_WEEKS, paymentReference } from '../lib/config'
 import {
@@ -28,7 +28,6 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
 
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [view, setView] = useState('main') // main | confirm-cancel | confirm-leave-reserve
@@ -62,12 +61,7 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
   const isOwnBooking = isBooked && !isLegacy && booking?.user_id === profile?.id
   const isOthersBooking = isBooked && !isOwnBooking
 
-  useEffect(() => {
-    fetchData()
-  }, [week.week_number, year])
-
   async function fetchData() {
-    setLoading(true)
     try {
       const fetches = []
 
@@ -169,10 +163,12 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
       await Promise.all(fetches)
     } catch (e) {
       console.error(e)
-    } finally {
-      setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchData()
+  }, [week.week_number, year])
 
   function copyToClipboard(text, field) {
     navigator.clipboard?.writeText(text).then(() => {

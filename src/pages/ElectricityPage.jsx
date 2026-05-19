@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Zap, Calculator, ArrowRight, CheckCircle2, Save } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getWeekDateRange, formatDateShort } from '../lib/weeks'
 import { PAYMENT } from '../lib/config'
 
@@ -19,10 +19,35 @@ export default function ElectricityPage() {
   const [savedAt, setSavedAt] = useState(null)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (!profile) return
-    fetchData()
-  }, [profile])
+  function pickPreferredBooking(bks, readingMap) {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    // Föredra bokning som pågår nu eller är närmast i tiden (förr eller framåt)
+    const withDates = bks.map((b) => {
+      const { checkIn, checkOut } = getWeekDateRange(b.year, b.week_number)
+      const isCurrent = today >= checkIn && today <= checkOut
+      const distance = Math.abs(checkIn.getTime() - today.getTime())
+      return { b, checkIn, checkOut, isCurrent, distance }
+    })
+    const current = withDates.find((x) => x.isCurrent)
+    if (current) return current.b
+    // Annars: senaste avslutade utan komplett avläsning
+    const past = withDates.filter((x) => x.checkOut < today)
+    const unfinished = past.find((x) => !readingMap[x.b.id]?.end_kwh)
+    if (unfinished) return unfinished.b
+    // Annars: närmaste
+    withDates.sort((a, b) => a.distance - b.distance)
+    return withDates[0]?.b
+  }
+
+  function selectBooking(bookingId, readingMap = readings) {
+    setSelectedBookingId(bookingId)
+    setError(null)
+    setSavedAt(null)
+    const r = readingMap[bookingId]
+    setStartKwh(r?.start_kwh != null ? String(r.start_kwh) : '')
+    setEndKwh(r?.end_kwh != null ? String(r.end_kwh) : '')
+  }
 
   async function fetchData() {
     setLoading(true)
@@ -56,35 +81,10 @@ export default function ElectricityPage() {
     setLoading(false)
   }
 
-  function pickPreferredBooking(bks, readingMap) {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    // Föredra bokning som pågår nu eller är närmast i tiden (förr eller framåt)
-    const withDates = bks.map((b) => {
-      const { checkIn, checkOut } = getWeekDateRange(b.year, b.week_number)
-      const isCurrent = today >= checkIn && today <= checkOut
-      const distance = Math.abs(checkIn.getTime() - today.getTime())
-      return { b, checkIn, checkOut, isCurrent, distance }
-    })
-    const current = withDates.find((x) => x.isCurrent)
-    if (current) return current.b
-    // Annars: senaste avslutade utan komplett avläsning
-    const past = withDates.filter((x) => x.checkOut < today)
-    const unfinished = past.find((x) => !readingMap[x.b.id]?.end_kwh)
-    if (unfinished) return unfinished.b
-    // Annars: närmaste
-    withDates.sort((a, b) => a.distance - b.distance)
-    return withDates[0]?.b
-  }
-
-  function selectBooking(bookingId, readingMap = readings) {
-    setSelectedBookingId(bookingId)
-    setError(null)
-    setSavedAt(null)
-    const r = readingMap[bookingId]
-    setStartKwh(r?.start_kwh != null ? String(r.start_kwh) : '')
-    setEndKwh(r?.end_kwh != null ? String(r.end_kwh) : '')
-  }
+  useEffect(() => {
+    if (!profile) return
+    fetchData()
+  }, [profile])
 
   const selectedBooking = useMemo(
     () => bookings.find((b) => b.id === selectedBookingId) || null,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear, getCurrentIsoWeek, isLotteryPassed } from '../lib/weeks'
 import { CalendarDays, ChevronLeft, ChevronRight, Check, Wrench } from 'lucide-react'
 import WeekPanel from '../components/WeekPanel'
@@ -26,19 +26,6 @@ export default function CalendarPage() {
   const totalWeeks = getWeeksForYear(year)
   const today = getCurrentIsoWeek()
   const currentWeekRef = useRef(null)
-
-  useEffect(() => {
-    fetchWeeks()
-    fetchLegacy()
-    fetchLotteryApps()
-    fetchOwnBookings()
-  }, [year, profile])
-
-  useEffect(() => {
-    if (!loading && year === today.year && currentWeekRef.current) {
-      currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }, [loading, year])
 
   async function fetchWeeks() {
     setLoading(true)
@@ -95,6 +82,19 @@ export default function CalendarPage() {
       .eq('year', year)
     setLotteryApps(data || [])
   }
+
+  useEffect(() => {
+    fetchWeeks()
+    fetchLegacy()
+    fetchLotteryApps()
+    fetchOwnBookings()
+  }, [year, profile])
+
+  useEffect(() => {
+    if (!loading && year === today.year && currentWeekRef.current) {
+      currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [loading, year])
 
   function getWeekData(weekNum) {
     const dbWeek = weeks.find((w) => w.week_number === weekNum)

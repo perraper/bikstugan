@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear } from '../lib/weeks'
 import { PAYMENT, REFUND_DEADLINE_WEEKS } from '../lib/config'
 import { downloadCsv, downloadJson, fetchBackupData, bookingsToCsv } from '../lib/backup'
@@ -143,7 +143,6 @@ export default function AdminPage() {
   const [allBookings, setAllBookings] = useState([])
   const [memberSearch, setMemberSearch] = useState('')
   const [confirmDialog, setConfirmDialog] = useState(null)
-  const [stats, setStats] = useState(null)
   const [issues, setIssues] = useState([])
   const [issueFilter, setIssueFilter] = useState('open')
   const [issueResponse, setIssueResponse] = useState({ id: null, text: '' })
@@ -162,6 +161,11 @@ export default function AdminPage() {
 
   const totalWeeks = getWeeksForYear(year)
 
+  // Funktionerna nedan deklareras senare i komponenten — hoistade
+  // function declarations är säkra att anropa här, men react-hooks-pluginet
+  // varnar pga risk för stale closure. Vi har inga deps utöver year/tab,
+  // så det är OK i praktiken.
+  /* eslint-disable react-hooks/immutability */
   useEffect(() => {
     fetchData()
     fetchPendingUsers()
@@ -176,6 +180,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (tab === 'audit') fetchAuditLog()
   }, [tab])
+  /* eslint-enable react-hooks/immutability */
 
   async function fetchAuditLog() {
     setAuditLoading(true)

@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-
-const AuthContext = createContext(null)
+import { AuthContext } from './useAuth'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -14,6 +13,19 @@ export function AuthProvider({ children }) {
     const hash = window.location.hash || ''
     return hash.includes('type=recovery')
   })
+
+  async function fetchProfile(userId) {
+    const { data } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    // Skriv inte över befintlig profil med null. Vid signup hinner auth-state
+    // skicka SIGNED_IN innan vi insertar users-raden — då får fetchProfile
+    // tomt svar, men signUp() sätter profilen direkt efter insert.
+    if (data) setProfile(data)
+    setLoading(false)
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -36,19 +48,6 @@ export function AuthProvider({ children }) {
 
     return () => subscription.unsubscribe()
   }, [])
-
-  async function fetchProfile(userId) {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    // Skriv inte över befintlig profil med null. Vid signup hinner auth-state
-    // skicka SIGNED_IN innan vi insertar users-raden — då får fetchProfile
-    // tomt svar, men signUp() sätter profilen direkt efter insert.
-    if (data) setProfile(data)
-    setLoading(false)
-  }
 
   async function signUp({ email, password, name, phone }) {
     const { data, error } = await supabase.auth.signUp({ email, password })
@@ -109,10 +108,4 @@ export function AuthProvider({ children }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
-  return ctx
 }
