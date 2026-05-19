@@ -122,12 +122,19 @@ Deno.serve(async (req) => {
         // är override för manuella testanrop.
         const portkod = payload.extra?.portkod || Deno.env.get('GATE_CODE') || '(saknas — kontakta admin)'
         const welcomeDates = getWeekDates(year!, weekNumber!)
+        const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=Haralds%C3%A5sen+59%2C+846+91+Hede'
         await sendEmail(
           user.email,
           `Välkommen till BIK-stugan — Vecka ${weekNumber}`,
           `
           <h2>Hej ${user.name}!</h2>
           <p>Snart är det dags! Här är information inför din vistelse vecka ${weekNumber}.</p>
+          <h3>Adress</h3>
+          <p style="margin:0">
+            <strong>Haraldsåsen 59, 846 91 Hede</strong><br>
+            <a href="${mapsUrl}">Öppna i Google Maps</a>
+          </p>
+          <p style="color:#666;font-size:14px;margin-top:8px">Håll utkik efter hjärtstartare och brandkårsmärke på fasad och dörr.</p>
           <h3>Portkod: ${portkod}</h3>
           <h3>Stugregler</h3>
           <ul>
