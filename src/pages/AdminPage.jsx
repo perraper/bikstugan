@@ -278,7 +278,6 @@ export default function AdminPage() {
   }
 
   async function fetchData() {
-    setLoading(true)
     const { data: weekData } = await supabase
       .from('weeks')
       .select('*, booked_by:users(name, email)')
@@ -312,8 +311,6 @@ export default function AdminPage() {
       for (const r of readingData || []) readingMap[r.booking_id] = r
     }
     setAllBookings((bookingData || []).map((b) => ({ ...b, electricity: readingMap[b.id] || null })))
-
-    setLoading(false)
   }
 
   async function toggleDepositPaid(booking) {
