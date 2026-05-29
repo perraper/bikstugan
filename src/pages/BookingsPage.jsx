@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getWeekDateRange, formatDateLong, getSeasonPrice } from '../lib/weeks'
 import { PAYMENT, paymentReference } from '../lib/config'
 import { cancelBooking, acceptReserveOffer } from '../lib/booking-actions'
 import { bookingsToIcs, downloadIcs } from '../lib/ical'
-import { CalendarCheck, Clock, Users, Ticket, Download, CreditCard, CheckCircle2, MessageSquare, Pencil, Save } from 'lucide-react'
+import { CalendarCheck, CalendarDays, Clock, Users, Ticket, Download, CreditCard, CheckCircle2, MessageSquare, Pencil, Save } from 'lucide-react'
 import Spinner from '../components/Spinner'
 import CancelBookingConfirm from '../components/CancelBookingConfirm'
 import CountdownBadge from '../components/CountdownBadge'
@@ -203,8 +204,15 @@ export default function BookingsPage() {
           )}
         </div>
         {bookings.length === 0 ? (
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">
-            Du har inga bekräftade bokningar ännu.
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center space-y-3">
+            <p className="text-slate-400 text-sm">Du har inga bekräftade bokningar ännu.</p>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Gå till kalender och boka
+            </Link>
           </div>
         ) : (
           bookings.map((b) => {
