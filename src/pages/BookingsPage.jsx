@@ -23,6 +23,7 @@ export default function BookingsPage() {
   const [acceptingOffer, setAcceptingOffer] = useState(null)
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [noteDraft, setNoteDraft] = useState('')
+  const [confirmOffer, setConfirmOffer] = useState(null)
 
   async function fetchData() {
     if (!profile) return
@@ -94,6 +95,25 @@ export default function BookingsPage() {
     fetchData()
   }, [profile])
 
+  useEffect(() => {
+    if (!profile) return
+    let timer = null
+    const trigger = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(fetchData, 500)
+    }
+    const channel = supabase
+      .channel(`bookings-user-${profile.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: `user_id=eq.${profile.id}` }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reserve_offers', filter: `offered_to_user_id=eq.${profile.id}` }, trigger)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'lottery_applications', filter: `user_id=eq.${profile.id}` }, trigger)
+      .subscribe()
+    return () => {
+      if (timer) clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
+  }, [profile])
+
   async function handleCancel(booking) {
     setCancelling(true)
     try {
@@ -131,6 +151,11 @@ export default function BookingsPage() {
     reserve: { text: 'Reserv', color: 'text-amber-600' },
     lost: { text: 'Ej vald', color: 'text-slate-400' },
   }
+
+  const currentYear = new Date().getFullYear()
+  const visibleLotteryApps = lotteryApps.filter(
+    (app) => app.year >= currentYear || (app.status !== 'lost' && app.status !== 'pending')
+  )
 
   if (loading) {
     return (
@@ -173,7 +198,7 @@ export default function BookingsPage() {
                   </div>
                 </div>
                 <button
-                  onClick={() => acceptOffer(offer)}
+                  onClick={() => setConfirmOffer(offer)}
                   disabled={acceptingOffer === offer.id}
                   className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm flex items-center justify-center gap-2 transition-colors"
                 >
@@ -374,12 +399,12 @@ export default function BookingsPage() {
 
       <div className="space-y-3">
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Lottningsanmälningar</h2>
-        {lotteryApps.length === 0 ? (
+        {visibleLotteryApps.length === 0 ? (
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">
             Du har inga aktiva lottningsanmälningar.
           </div>
         ) : (
-          lotteryApps.map((app) => {
+          visibleLotteryApps.map((app) => {
             const dates = getWeekDateRange(app.year, app.week_number)
             const st = statusLabel[app.status] || statusLabel.pending
 
@@ -402,6 +427,52 @@ export default function BookingsPage() {
           })
         )}
       </div>
+
+      {confirmOffer && (() => {
+        const dates = getWeekDateRange(confirmOffer.year, confirmOffer.week_number)
+        const season = getSeasonPrice(confirmOffer.week_number)
+        const hoursLeft = Math.max(0, Math.round((new Date(confirmOffer.deadline) - Date.now()) / 3600000))
+        const remaining = season.price - PAYMENT.depositAmount
+        return (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm px-4 pb-4">
+            <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm p-5 space-y-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-800">Bekräfta bokning</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{hoursLeft}h kvar att svara på erbjudandet</p>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
+                <div className="text-sm font-medium text-slate-800">
+                  Vecka {confirmOffer.week_number}, {confirmOffer.year}
+                </div>
+                <div className="text-xs text-slate-500 flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {formatDateLong(dates.checkIn)} – {formatDateLong(dates.checkOut)}
+                </div>
+                <div className="text-xs text-slate-500">{season.label} · <strong className="text-slate-700">{season.price} kr</strong></div>
+              </div>
+              <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-800">
+                <CreditCard className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
+                <strong>{PAYMENT.depositAmount} kr</strong> i anmälningsavgift på plusgiro — resterande <strong>{remaining} kr</strong> faktureras.
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmOffer(null)}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={() => { acceptOffer(confirmOffer); setConfirmOffer(null) }}
+                  disabled={acceptingOffer === confirmOffer.id}
+                  className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm flex items-center justify-center gap-2 transition-colors"
+                >
+                  {acceptingOffer === confirmOffer.id ? <Spinner /> : 'Bekräfta bokning'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {cancelTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm px-4 pb-4">
