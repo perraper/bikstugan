@@ -91,9 +91,9 @@ export default function Layout() {
         <Outlet />
       </main>
 
-      {/* Mobile bottom tab bar */}
+      {/* Mobile bottom tab bar — z-40 so modals/overlays (z-50) render above it */}
       <nav
-        className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-slate-200"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <div className="flex items-center justify-around h-16">
