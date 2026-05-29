@@ -352,18 +352,54 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
 
               {/* === UNDERHÅLL === */}
               {isMaintenance && (
-                <div className="bg-stone-100 border border-stone-300 rounded-lg p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-stone-700">
-                    <Wrench className="w-4 h-4 text-amber-500" />
-                    Underhåll / renovering
+                <>
+                  <div className="bg-stone-100 border border-stone-300 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                      <Wrench className="w-4 h-4 text-amber-500" />
+                      Underhåll / renovering
+                    </div>
+                    {week.legacyName && (
+                      <div className="text-sm text-stone-600">{week.legacyName}</div>
+                    )}
+                    <p className="text-xs text-stone-500">
+                      Veckan är blockerad för arbete. Ställ dig i kö om du vill ha chansen att boka ifall underhållet ställs in.
+                    </p>
                   </div>
-                  {week.legacyName && (
-                    <div className="text-sm text-stone-600">{week.legacyName}</div>
+
+                  {ownReserve ? (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-amber-800 font-medium">
+                        <Star className="w-4 h-4" />
+                        Du står i kö #{ownLotteryApp?.reserve_rank}
+                      </div>
+                      <p className="text-xs text-amber-700">
+                        Om underhållet ställs in och veckan öppnas upp kontaktar admin ködeltagarna.
+                      </p>
+                      <button
+                        onClick={() => setView('confirm-leave-reserve')}
+                        disabled={actionLoading}
+                        className="text-xs text-amber-700 hover:text-amber-900 underline"
+                      >
+                        Ta bort mig från kön
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleJoinReserve}
+                      disabled={actionLoading}
+                      className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 font-medium rounded-lg px-4 py-2.5 text-sm flex items-center justify-center gap-2 transition-colors"
+                    >
+                      {actionLoading ? <Spinner color="amber" /> : <><Star className="w-4 h-4" /> Ställ mig i kö</>}
+                    </button>
                   )}
-                  <p className="text-xs text-stone-500">
-                    Veckan är blockerad för arbete och kan inte bokas.
-                  </p>
-                </div>
+
+                  {reserves.length > 0 && (
+                    <div className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+                      <Users className="w-3.5 h-3.5 inline -mt-0.5 mr-1 text-slate-400" />
+                      {reserves.length} {reserves.length === 1 ? 'person' : 'personer'} i kön
+                    </div>
+                  )}
+                </>
               )}
 
               {/* === BOKAD === */}
