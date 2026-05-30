@@ -36,12 +36,14 @@ END;
 $$;
 
 -- 3. Strama åt users INSERT-policy:
---    Med CHECK (true) kunde en ny användare sätta role='admin' eller approved=true.
---    Ny policy: id måste matcha auth.uid(), role måste vara 'member', approved=false.
+--    Med CHECK (true) kunde en ny användare sätta role='admin'.
+--    Ny policy: id måste matcha auth.uid() och role måste vara 'member'.
+--    OBS: approved-villkor utelämnas med avsikt — auto_approve_user-triggern
+--    (BEFORE INSERT) kan sätta approved=true för allowlistade mejl, och det
+--    skulle krocka med ett approved=FALSE-krav i WITH CHECK.
 DROP POLICY IF EXISTS "Users: insert own" ON public.users;
 CREATE POLICY "Users: insert own" ON public.users
   FOR INSERT WITH CHECK (
     auth.uid() = id
     AND role = 'member'
-    AND approved = FALSE
   );
