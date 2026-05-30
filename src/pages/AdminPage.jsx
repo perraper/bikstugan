@@ -34,6 +34,7 @@ const AUDIT_LABELS = {
   'booking.toggle_deposit_paid':      { label: 'Anmälningsavgift', tone: 'emerald' },
   'booking.toggle_final_paid':        { label: 'Slutbetalning',    tone: 'emerald' },
   'booking.toggle_electricity_paid':  { label: 'El-betalning',     tone: 'amber'   },
+  'booking.edit_electricity':         { label: 'El-avläsning',     tone: 'amber'   },
   'booking.mark_refunded':        { label: 'Återbetald (anm.)', tone: 'amber' },
   'booking.mark_final_refunded':  { label: 'Återbetald (slut)', tone: 'amber' },
   'user.approve':                 { label: 'Godkände',          tone: 'emerald' },
@@ -62,6 +63,8 @@ function renderAuditSummary(row) {
       return `V${d.week_number}/${d.year} slutbet → ${d.after?.final_paid ? 'betald' : 'obetald'}`
     case 'booking.toggle_electricity_paid':
       return `V${d.week_number}/${d.year} el → ${d.after?.electricity_paid ? 'betald' : 'obetald'}`
+    case 'booking.edit_electricity':
+      return `V${d.week_number}/${d.year} el ${d.before?.start_kwh}→${d.before?.end_kwh ?? '?'} ändrat till ${d.after?.start_kwh}→${d.after?.end_kwh ?? '?'} kWh`
     case 'booking.mark_refunded':
       return `V${d.week_number}/${d.year} anm.avg återbetald`
     case 'booking.mark_final_refunded':
@@ -132,6 +135,8 @@ export default function AdminPage() {
   const [tab, setTab] = useState('payments')
   const [pendingUsers, setPendingUsers] = useState([])
   const [allUsers, setAllUsers] = useState([])
+  const [editingElId, setEditingElId] = useState(null)
+  const [elDraft, setElDraft] = useState({ start: '', end: '' })
   const [approvingId, setApprovingId] = useState(null)
   const [selectedMember, setSelectedMember] = useState(null)
   const [memberBookings, setMemberBookings] = useState([])
@@ -335,6 +340,33 @@ export default function AdminPage() {
         week_number: booking.week_number,
         before: { deposit_paid: booking.deposit_paid },
         after: { deposit_paid: newPaid },
+      },
+    })
+  }
+
+  async function saveElectricity(booking) {
+    const startNum = Number(elDraft.start)
+    const endNum = elDraft.end === '' ? null : Number(elDraft.end)
+    if (isNaN(startNum) || elDraft.start === '') return
+    const { data, error } = await supabase
+      .from('electricity_readings')
+      .update({ start_kwh: startNum, end_kwh: endNum })
+      .eq('id', booking.electricity.id)
+      .select('id, booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
+      .single()
+    if (error) return
+    setAllBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, electricity: data } : b))
+    setMemberBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, electricity: data } : b))
+    setEditingElId(null)
+    logAdminAction('booking.edit_electricity', {
+      table: 'electricity_readings',
+      id: booking.electricity.id,
+      details: {
+        user_id: booking.user_id,
+        year: booking.year,
+        week_number: booking.week_number,
+        before: { start_kwh: booking.electricity.start_kwh, end_kwh: booking.electricity.end_kwh },
+        after: { start_kwh: startNum, end_kwh: endNum },
       },
     })
   }
@@ -1064,29 +1096,63 @@ export default function AdminPage() {
                       </div>
                     </div>
                     {b.electricity && (
-                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50/80 border border-amber-100 rounded px-2 py-1">
-                        <Zap className="w-3 h-3 shrink-0" />
-                        {b.electricity.end_kwh != null ? (
-                          <>
-                            <span className="flex-1">
-                              El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ({Math.max(0, b.electricity.end_kwh - b.electricity.start_kwh)} kWh) ·{' '}
-                              <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
-                            </span>
-                            <button
-                              onClick={() => toggleElectricityPaid(b)}
-                              className={`ml-1 shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
-                                b.electricity.electricity_paid
-                                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                  : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
-                              }`}
-                            >
-                              {b.electricity.electricity_paid ? <><CheckCircle2 className="w-2.5 h-2.5" /> Betald</> : 'Markera betald'}
-                            </button>
-                          </>
-                        ) : (
-                          <span>El påbörjad: {b.electricity.start_kwh} kWh (slutavläsning saknas)</span>
-                        )}
-                      </div>
+                      editingElId === b.id ? (
+                        <div className="mt-2 bg-amber-50/80 border border-amber-200 rounded px-2 py-2 space-y-2">
+                          <div className="flex items-center gap-1 text-[11px] font-medium text-amber-700">
+                            <Zap className="w-3 h-3" /> Redigera elavläsning
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <input
+                              type="number"
+                              value={elDraft.start}
+                              onChange={(e) => setElDraft((d) => ({ ...d, start: e.target.value }))}
+                              placeholder="Start kWh"
+                              className="w-24 bg-white border border-amber-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            />
+                            <span className="text-[11px] text-slate-400">→</span>
+                            <input
+                              type="number"
+                              value={elDraft.end}
+                              onChange={(e) => setElDraft((d) => ({ ...d, end: e.target.value }))}
+                              placeholder="Slut kWh"
+                              className="w-28 bg-white border border-amber-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                            />
+                            <button onClick={() => saveElectricity(b)} className="text-[10px] bg-amber-500 hover:bg-amber-600 text-white font-medium px-2 py-1 rounded transition-colors">Spara</button>
+                            <button onClick={() => setEditingElId(null)} className="text-[10px] text-slate-500 hover:text-slate-700 px-1 py-1">Avbryt</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50/80 border border-amber-100 rounded px-2 py-1">
+                          <Zap className="w-3 h-3 shrink-0" />
+                          {b.electricity.end_kwh != null ? (
+                            <>
+                              <span className="flex-1">
+                                El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ({Math.max(0, b.electricity.end_kwh - b.electricity.start_kwh)} kWh) ·{' '}
+                                <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
+                              </span>
+                              <button
+                                onClick={() => toggleElectricityPaid(b)}
+                                className={`ml-1 shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                                  b.electricity.electricity_paid
+                                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                    : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
+                                }`}
+                              >
+                                {b.electricity.electricity_paid ? <><CheckCircle2 className="w-2.5 h-2.5" /> Betald</> : 'Markera betald'}
+                              </button>
+                            </>
+                          ) : (
+                            <span className="flex-1">El påbörjad: {b.electricity.start_kwh} kWh (slutavläsning saknas)</span>
+                          )}
+                          <button
+                            onClick={() => { setEditingElId(b.id); setElDraft({ start: String(b.electricity.start_kwh), end: b.electricity.end_kwh != null ? String(b.electricity.end_kwh) : '' }) }}
+                            className="ml-1 shrink-0 text-slate-400 hover:text-amber-600 transition-colors"
+                            title="Redigera avläsning"
+                          >
+                            <Pencil className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      )
                     )}
                     {b.note && (
                       <div className="mt-2 flex items-start gap-1.5 text-[11px] text-slate-500 bg-white/60 rounded px-2 py-1">
@@ -1990,29 +2056,63 @@ export default function AdminPage() {
                         </div>
                       </div>
                       {b.electricity && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
-                          <Zap className="w-3 h-3 shrink-0" />
-                          {b.electricity.end_kwh != null ? (
-                            <>
-                              <span className="flex-1">
-                                El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ·{' '}
-                                <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
-                              </span>
-                              <button
-                                onClick={() => toggleElectricityPaid(b)}
-                                className={`ml-1 shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
-                                  b.electricity.electricity_paid
-                                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                    : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
-                                }`}
-                              >
-                                {b.electricity.electricity_paid ? <><CheckCircle2 className="w-2.5 h-2.5" /> Betald</> : 'Markera betald'}
-                              </button>
-                            </>
-                          ) : (
-                            <span>El påbörjad: {b.electricity.start_kwh} kWh</span>
-                          )}
-                        </div>
+                        editingElId === b.id ? (
+                          <div className="bg-amber-50 border border-amber-200 rounded px-2 py-2 space-y-2">
+                            <div className="flex items-center gap-1 text-[11px] font-medium text-amber-700">
+                              <Zap className="w-3 h-3" /> Redigera elavläsning
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <input
+                                type="number"
+                                value={elDraft.start}
+                                onChange={(e) => setElDraft((d) => ({ ...d, start: e.target.value }))}
+                                placeholder="Start kWh"
+                                className="w-24 bg-white border border-amber-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                              />
+                              <span className="text-[11px] text-slate-400">→</span>
+                              <input
+                                type="number"
+                                value={elDraft.end}
+                                onChange={(e) => setElDraft((d) => ({ ...d, end: e.target.value }))}
+                                placeholder="Slut kWh"
+                                className="w-28 bg-white border border-amber-200 rounded px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-400"
+                              />
+                              <button onClick={() => saveElectricity(b)} className="text-[10px] bg-amber-500 hover:bg-amber-600 text-white font-medium px-2 py-1 rounded transition-colors">Spara</button>
+                              <button onClick={() => setEditingElId(null)} className="text-[10px] text-slate-500 hover:text-slate-700 px-1 py-1">Avbryt</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
+                            <Zap className="w-3 h-3 shrink-0" />
+                            {b.electricity.end_kwh != null ? (
+                              <>
+                                <span className="flex-1">
+                                  El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ·{' '}
+                                  <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
+                                </span>
+                                <button
+                                  onClick={() => toggleElectricityPaid(b)}
+                                  className={`ml-1 shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                                    b.electricity.electricity_paid
+                                      ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                      : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
+                                  }`}
+                                >
+                                  {b.electricity.electricity_paid ? <><CheckCircle2 className="w-2.5 h-2.5" /> Betald</> : 'Markera betald'}
+                                </button>
+                              </>
+                            ) : (
+                              <span className="flex-1">El påbörjad: {b.electricity.start_kwh} kWh</span>
+                            )}
+                            <button
+                              onClick={() => { setEditingElId(b.id); setElDraft({ start: String(b.electricity.start_kwh), end: b.electricity.end_kwh != null ? String(b.electricity.end_kwh) : '' }) }}
+                              className="ml-1 shrink-0 text-slate-400 hover:text-amber-600 transition-colors"
+                              title="Redigera avläsning"
+                            >
+                              <Pencil className="w-2.5 h-2.5" />
+                            </button>
+                          </div>
+                        )
                       )}
                     </div>
                   )
