@@ -2026,52 +2026,80 @@ export default function AdminPage() {
             </div>
           )}
 
-          {legacyBookings.length === 0 ? (
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 text-center text-slate-400 text-sm">
-              Inga historiska bokningar för {year}.
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {legacyBookings.map((b) => {
-                const typeConfig = {
-                  booking:     { bg: 'bg-white',       border: 'border-slate-200', icon: <CalendarDays className="w-3.5 h-3.5 text-blue-500" />,    label: null },
-                  maintenance: { bg: 'bg-amber-50/60', border: 'border-amber-200', icon: <Wrench className="w-3.5 h-3.5 text-amber-500" />,         label: 'Underhåll' },
-                  cancelled:   { bg: 'bg-slate-50',    border: 'border-slate-200', icon: <X className="w-3.5 h-3.5 text-slate-400" />,              label: 'Avbokad' },
-                  interest:    { bg: 'bg-purple-50/60',border: 'border-purple-200',icon: <Star className="w-3.5 h-3.5 text-purple-500" />,          label: 'Intresse' },
-                }[b.type] || { bg: 'bg-white', border: 'border-slate-200', icon: null, label: null }
+          {(() => {
+            const realEntries = allBookings
+              .filter((b) => b.status === 'confirmed')
+              .map((b) => ({ _src: 'real', week_number: b.week_number, _b: b }))
+            const legacyEntries = legacyBookings.map((b) => ({ _src: 'legacy', week_number: b.week_number, _b: b }))
+            const combined = [...realEntries, ...legacyEntries].sort((a, b) => a.week_number - b.week_number)
 
-                return (
-                  <div key={b.id} className={`border rounded-lg px-3 py-2 flex items-center gap-2.5 ${typeConfig.bg} ${typeConfig.border}`}>
-                    <div className="text-xs font-bold text-slate-500 w-7 shrink-0">V{b.week_number}</div>
-                    {typeConfig.icon}
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-medium truncate ${b.type === 'cancelled' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                        {b.booked_by_name}
-                        {b.reserve_name && <span className="text-slate-400 font-normal"> / {b.reserve_name}</span>}
+            if (combined.length === 0) return (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 text-center text-slate-400 text-sm">
+                Inga bokningar för {year}.
+              </div>
+            )
+
+            return (
+              <div className="space-y-1.5">
+                {combined.map((entry) => {
+                  if (entry._src === 'real') {
+                    const b = entry._b
+                    const payStatus = b.deposit_paid && b.final_paid ? 'Fullt betald' : b.deposit_paid ? 'Anm.avg betald' : null
+                    return (
+                      <div key={`real-${b.id}`} className="border border-sky-200 bg-sky-50/40 rounded-lg px-3 py-2 flex items-center gap-2.5">
+                        <div className="text-xs font-bold text-slate-500 w-7 shrink-0">V{b.week_number}</div>
+                        <CalendarDays className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-slate-700 truncate">{b.user?.name || 'Okänd'}</div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            {[b.price ? `${b.price} kr` : null, payStatus].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-sky-600 bg-sky-100 px-1.5 py-0.5 rounded font-medium shrink-0">System</span>
                       </div>
-                      <div className="text-[11px] text-slate-400 truncate">
-                        {[typeConfig.label, b.price ? `${b.price} kr` : null, b.paid ? `betalt: ${b.paid}` : null, b.notes].filter(Boolean).join(' · ')}
+                    )
+                  }
+
+                  const b = entry._b
+                  const typeConfig = {
+                    booking:     { bg: 'bg-white',       border: 'border-slate-200', icon: <CalendarDays className="w-3.5 h-3.5 text-blue-500" />,    label: null },
+                    maintenance: { bg: 'bg-amber-50/60', border: 'border-amber-200', icon: <Wrench className="w-3.5 h-3.5 text-amber-500" />,         label: 'Underhåll' },
+                    cancelled:   { bg: 'bg-slate-50',    border: 'border-slate-200', icon: <X className="w-3.5 h-3.5 text-slate-400" />,              label: 'Avbokad' },
+                    interest:    { bg: 'bg-purple-50/60',border: 'border-purple-200',icon: <Star className="w-3.5 h-3.5 text-purple-500" />,          label: 'Intresse' },
+                  }[b.type] || { bg: 'bg-white', border: 'border-slate-200', icon: null, label: null }
+                  return (
+                    <div key={`legacy-${b.id}`} className={`border rounded-lg px-3 py-2 flex items-center gap-2.5 ${typeConfig.bg} ${typeConfig.border}`}>
+                      <div className="text-xs font-bold text-slate-500 w-7 shrink-0">V{b.week_number}</div>
+                      {typeConfig.icon}
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-sm font-medium truncate ${b.type === 'cancelled' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                          {b.booked_by_name}
+                          {b.reserve_name && <span className="text-slate-400 font-normal"> / {b.reserve_name}</span>}
+                        </div>
+                        <div className="text-[11px] text-slate-400 truncate">
+                          {[typeConfig.label, b.price ? `${b.price} kr` : null, b.paid ? `betalt: ${b.paid}` : null, b.notes].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <button
+                          onClick={() => setLegacyForm({ ...b })}
+                          className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded transition-colors"
+                        >
+                          Redigera
+                        </button>
+                        <button
+                          onClick={() => deleteLegacyBooking(b.id)}
+                          className="p-1 hover:bg-red-50 text-slate-300 hover:text-red-400 rounded transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex gap-1 shrink-0">
-                      <button
-                        onClick={() => setLegacyForm({ ...b })}
-                        className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded transition-colors"
-                      >
-                        Redigera
-                      </button>
-                      <button
-                        onClick={() => deleteLegacyBooking(b.id)}
-                        className="p-1 hover:bg-red-50 text-slate-300 hover:text-red-400 rounded transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )
+          })()}
         </div>
       )}
 
