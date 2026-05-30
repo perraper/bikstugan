@@ -31,8 +31,9 @@ import { CSS } from '@dnd-kit/utilities'
 import Spinner from '../components/Spinner'
 
 const AUDIT_LABELS = {
-  'booking.toggle_deposit_paid':  { label: 'Anmälningsavgift', tone: 'emerald' },
-  'booking.toggle_final_paid':    { label: 'Slutbetalning',    tone: 'emerald' },
+  'booking.toggle_deposit_paid':      { label: 'Anmälningsavgift', tone: 'emerald' },
+  'booking.toggle_final_paid':        { label: 'Slutbetalning',    tone: 'emerald' },
+  'booking.toggle_electricity_paid':  { label: 'El-betalning',     tone: 'amber'   },
   'booking.mark_refunded':        { label: 'Återbetald (anm.)', tone: 'amber' },
   'booking.mark_final_refunded':  { label: 'Återbetald (slut)', tone: 'amber' },
   'user.approve':                 { label: 'Godkände',          tone: 'emerald' },
@@ -59,6 +60,8 @@ function renderAuditSummary(row) {
       return `V${d.week_number}/${d.year} anm.avg → ${d.after?.deposit_paid ? 'betald' : 'obetald'}`
     case 'booking.toggle_final_paid':
       return `V${d.week_number}/${d.year} slutbet → ${d.after?.final_paid ? 'betald' : 'obetald'}`
+    case 'booking.toggle_electricity_paid':
+      return `V${d.week_number}/${d.year} el → ${d.after?.electricity_paid ? 'betald' : 'obetald'}`
     case 'booking.mark_refunded':
       return `V${d.week_number}/${d.year} anm.avg återbetald`
     case 'booking.mark_final_refunded':
@@ -306,7 +309,7 @@ export default function AdminPage() {
     if (ids.length) {
       const { data: readingData } = await supabase
         .from('electricity_readings')
-        .select('booking_id, start_kwh, end_kwh, cost')
+        .select('id, booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
         .in('booking_id', ids)
       for (const r of readingData || []) readingMap[r.booking_id] = r
     }
@@ -332,6 +335,30 @@ export default function AdminPage() {
         week_number: booking.week_number,
         before: { deposit_paid: booking.deposit_paid },
         after: { deposit_paid: newPaid },
+      },
+    })
+  }
+
+  async function toggleElectricityPaid(booking) {
+    const r = booking.electricity
+    const newPaid = !r.electricity_paid
+    const newPaidAt = newPaid ? new Date().toISOString() : null
+    await supabase
+      .from('electricity_readings')
+      .update({ electricity_paid: newPaid, electricity_paid_at: newPaidAt })
+      .eq('id', r.id)
+    const updated = { ...r, electricity_paid: newPaid, electricity_paid_at: newPaidAt }
+    setAllBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, electricity: updated } : b))
+    setMemberBookings((prev) => prev.map((b) => b.id === booking.id ? { ...b, electricity: updated } : b))
+    logAdminAction('booking.toggle_electricity_paid', {
+      table: 'electricity_readings',
+      id: r.id,
+      details: {
+        user_id: booking.user_id,
+        year: booking.year,
+        week_number: booking.week_number,
+        before: { electricity_paid: r.electricity_paid },
+        after: { electricity_paid: newPaid },
       },
     })
   }
@@ -490,7 +517,7 @@ export default function AdminPage() {
     if (ids.length) {
       const { data: readingData } = await supabase
         .from('electricity_readings')
-        .select('booking_id, start_kwh, end_kwh, cost')
+        .select('id, booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
         .in('booking_id', ids)
       for (const r of readingData || []) readingMap[r.booking_id] = r
     }
@@ -1040,10 +1067,22 @@ export default function AdminPage() {
                       <div className="mt-2 flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50/80 border border-amber-100 rounded px-2 py-1">
                         <Zap className="w-3 h-3 shrink-0" />
                         {b.electricity.end_kwh != null ? (
-                          <span>
-                            El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ({Math.max(0, b.electricity.end_kwh - b.electricity.start_kwh)} kWh) ·{' '}
-                            <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
-                          </span>
+                          <>
+                            <span className="flex-1">
+                              El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ({Math.max(0, b.electricity.end_kwh - b.electricity.start_kwh)} kWh) ·{' '}
+                              <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
+                            </span>
+                            <button
+                              onClick={() => toggleElectricityPaid(b)}
+                              className={`ml-1 shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                                b.electricity.electricity_paid
+                                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                  : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
+                              }`}
+                            >
+                              {b.electricity.electricity_paid ? <><CheckCircle2 className="w-2.5 h-2.5" /> Betald</> : 'Markera betald'}
+                            </button>
+                          </>
                         ) : (
                           <span>El påbörjad: {b.electricity.start_kwh} kWh (slutavläsning saknas)</span>
                         )}
@@ -1954,10 +1993,22 @@ export default function AdminPage() {
                         <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1">
                           <Zap className="w-3 h-3 shrink-0" />
                           {b.electricity.end_kwh != null ? (
-                            <span>
-                              El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ·{' '}
-                              <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
-                            </span>
+                            <>
+                              <span className="flex-1">
+                                El: {b.electricity.start_kwh}→{b.electricity.end_kwh} kWh ·{' '}
+                                <strong>{Math.round(Number(b.electricity.cost || 0)).toLocaleString('sv-SE')} kr</strong>
+                              </span>
+                              <button
+                                onClick={() => toggleElectricityPaid(b)}
+                                className={`ml-1 shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                                  b.electricity.electricity_paid
+                                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                    : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
+                                }`}
+                              >
+                                {b.electricity.electricity_paid ? <><CheckCircle2 className="w-2.5 h-2.5" /> Betald</> : 'Markera betald'}
+                              </button>
+                            </>
                           ) : (
                             <span>El påbörjad: {b.electricity.start_kwh} kWh</span>
                           )}
