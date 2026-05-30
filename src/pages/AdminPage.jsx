@@ -2044,18 +2044,22 @@ export default function AdminPage() {
                 {combined.map((entry) => {
                   if (entry._src === 'real') {
                     const b = entry._b
+                    const { checkOut } = getWeekDateRange(b.year, b.week_number)
+                    const upcoming = checkOut >= new Date()
                     const payStatus = b.deposit_paid && b.final_paid ? 'Fullt betald' : b.deposit_paid ? 'Anm.avg betald' : null
                     return (
-                      <div key={`real-${b.id}`} className="border border-sky-200 bg-sky-50/40 rounded-lg px-3 py-2 flex items-center gap-2.5">
+                      <div key={`real-${b.id}`} className={`border rounded-lg px-3 py-2 flex items-center gap-2.5 ${upcoming ? 'border-emerald-200 bg-emerald-50/40' : 'border-sky-200 bg-sky-50/40'}`}>
                         <div className="text-xs font-bold text-slate-500 w-7 shrink-0">V{b.week_number}</div>
-                        <CalendarDays className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                        <CalendarDays className={`w-3.5 h-3.5 shrink-0 ${upcoming ? 'text-emerald-500' : 'text-sky-500'}`} />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-slate-700 truncate">{b.user?.name || 'Okänd'}</div>
                           <div className="text-[11px] text-slate-400 truncate">
                             {[b.price ? `${b.price} kr` : null, payStatus].filter(Boolean).join(' · ')}
                           </div>
                         </div>
-                        <span className="text-[10px] text-sky-600 bg-sky-100 px-1.5 py-0.5 rounded font-medium shrink-0">System</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${upcoming ? 'text-emerald-700 bg-emerald-100' : 'text-sky-600 bg-sky-100'}`}>
+                          {upcoming ? 'Kommande' : 'Genomförd'}
+                        </span>
                       </div>
                     )
                   }
