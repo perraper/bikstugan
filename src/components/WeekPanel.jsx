@@ -975,6 +975,31 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
     setBusy(false)
   }
 
+  async function sendFinalReminder() {
+    if (!booking) return
+    setBusy(true); setErr('')
+    try {
+      const remaining = Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount))
+      await supabase.functions.invoke('send-email', {
+        body: {
+          type: 'final_reminder',
+          userId: booking.user_id,
+          weekNumber: week.week_number,
+          year,
+          extra: { reminderCount: (booking.final_reminder_count || 0) + 1, remaining },
+        },
+      })
+      await supabase.from('bookings').update({
+        final_reminder_count: (booking.final_reminder_count || 0) + 1,
+        final_reminder_last_at: new Date().toISOString(),
+      }).eq('id', booking.id)
+      await onAfterAction()
+    } catch (e) {
+      setErr(e.message)
+    }
+    setBusy(false)
+  }
+
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
       <button
@@ -1075,34 +1100,57 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
                 {booking.user?.name} ({booking.user?.email})
                 {booking.user?.phone && <> · {booking.user.phone}</>}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {booking.deposit_paid ? (
-                  <button
-                    disabled={busy}
-                    onClick={markDepositUnpaid}
-                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded flex items-center gap-1"
-                  >
-                    <RotateCcw className="w-3 h-3" /> Ångra "betald"
-                  </button>
-                ) : (
-                  <>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-slate-400 w-16 shrink-0">Anm.avg</span>
+                  {booking.deposit_paid ? (
                     <button
                       disabled={busy}
-                      onClick={markDepositPaid}
-                      className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded flex items-center gap-1"
+                      onClick={markDepositUnpaid}
+                      className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded flex items-center gap-1"
                     >
-                      <Check className="w-3 h-3" /> Markera betald
+                      <RotateCcw className="w-3 h-3" /> Ångra "betald"
                     </button>
-                    <button
-                      disabled={busy}
-                      onClick={sendReminder}
-                      className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded flex items-center gap-1"
-                      title={booking.deposit_reminder_count ? `${booking.deposit_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
-                    >
-                      <Send className="w-3 h-3" /> Skicka påminnelse
-                      {booking.deposit_reminder_count > 0 && ` (${booking.deposit_reminder_count})`}
-                    </button>
-                  </>
+                  ) : (
+                    <>
+                      <button
+                        disabled={busy}
+                        onClick={markDepositPaid}
+                        className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded flex items-center gap-1"
+                      >
+                        <Check className="w-3 h-3" /> Markera betald
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={sendReminder}
+                        className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded flex items-center gap-1"
+                        title={booking.deposit_reminder_count ? `${booking.deposit_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
+                      >
+                        <Send className="w-3 h-3" /> Skicka påminnelse
+                        {booking.deposit_reminder_count > 0 && ` (${booking.deposit_reminder_count})`}
+                      </button>
+                    </>
+                  )}
+                </div>
+                {Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount)) > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] text-slate-400 w-16 shrink-0">Slutbet.</span>
+                    {booking.final_paid ? (
+                      <span className="text-xs text-emerald-600 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Betald
+                      </span>
+                    ) : (
+                      <button
+                        disabled={busy}
+                        onClick={sendFinalReminder}
+                        className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded flex items-center gap-1"
+                        title={booking.final_reminder_count ? `${booking.final_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
+                      >
+                        <Send className="w-3 h-3" /> Skicka påminnelse
+                        {booking.final_reminder_count > 0 && ` (${booking.final_reminder_count})`}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               {booking.note && (

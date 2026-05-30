@@ -35,6 +35,7 @@ const AUDIT_LABELS = {
   'booking.toggle_deposit_paid':      { label: 'Anmälningsavgift', tone: 'emerald' },
   'booking.toggle_final_paid':        { label: 'Slutbetalning',    tone: 'emerald' },
   'booking.toggle_electricity_paid':  { label: 'El-betalning',     tone: 'amber'   },
+  'booking.final_reminder':           { label: 'Slutbet.påminnelse', tone: 'blue'  },
   'booking.edit_electricity':         { label: 'El-avläsning',     tone: 'amber'   },
   'booking.add_electricity':          { label: 'El-avläsning',     tone: 'amber'   },
   'booking.mark_refunded':        { label: 'Återbetald (anm.)', tone: 'amber' },
@@ -65,6 +66,8 @@ function renderAuditSummary(row) {
       return `V${d.week_number}/${d.year} slutbet → ${d.after?.final_paid ? 'betald' : 'obetald'}`
     case 'booking.toggle_electricity_paid':
       return `V${d.week_number}/${d.year} el → ${d.after?.electricity_paid ? 'betald' : 'obetald'}`
+    case 'booking.final_reminder':
+      return `V${d.week_number}/${d.year} slutbet-påminnelse skickad (#${d.after?.final_reminder_count})`
     case 'booking.edit_electricity':
       return `V${d.week_number}/${d.year} el ${d.before?.start_kwh}→${d.before?.end_kwh ?? '?'} ändrat till ${d.after?.start_kwh}→${d.after?.end_kwh ?? '?'} kWh`
     case 'booking.add_electricity':
@@ -157,6 +160,7 @@ export default function AdminPage() {
   const [allBookings, setAllBookings] = useState([])
   const [memberSearch, setMemberSearch] = useState('')
   const [paymentFilter, setPaymentFilter] = useState('all')
+  const [remindingId, setRemindingId] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [issues, setIssues] = useState([])
   const [issueFilter, setIssueFilter] = useState('open')
@@ -427,6 +431,47 @@ export default function AdminPage() {
         after: { final_paid: newPaid },
       },
     })
+  }
+
+  async function sendFinalReminder(booking) {
+    const remaining = finalRemaining(booking)
+    if (remaining <= 0) return
+    setRemindingId(booking.id)
+    try {
+      await supabase.functions.invoke('send-email', {
+        body: {
+          type: 'final_reminder',
+          userId: booking.user_id,
+          weekNumber: booking.week_number,
+          year: booking.year,
+          extra: { reminderCount: (booking.final_reminder_count || 0) + 1, remaining },
+        },
+      })
+      const newCount = (booking.final_reminder_count || 0) + 1
+      const newAt = new Date().toISOString()
+      await supabase
+        .from('bookings')
+        .update({ final_reminder_count: newCount, final_reminder_last_at: newAt })
+        .eq('id', booking.id)
+      const patch = (b) => b.id === booking.id
+        ? { ...b, final_reminder_count: newCount, final_reminder_last_at: newAt }
+        : b
+      setAllBookings((prev) => prev.map(patch))
+      setMemberBookings((prev) => prev.map(patch))
+      logAdminAction('booking.final_reminder', {
+        table: 'bookings',
+        id: booking.id,
+        details: {
+          user_id: booking.user_id,
+          year: booking.year,
+          week_number: booking.week_number,
+          after: { final_reminder_count: newCount },
+        },
+      })
+    } catch (e) {
+      console.error(e)
+    }
+    setRemindingId(null)
   }
 
   async function fetchPendingUsers() {
@@ -1152,7 +1197,10 @@ export default function AdminPage() {
                               <span className="text-slate-500"> · kvar {remaining.toLocaleString('sv-SE')} kr</span>
                             )}
                             {!b.deposit_paid && b.deposit_reminder_count > 0 && (
-                              <span className="text-amber-600"> · {b.deposit_reminder_count} påm. skickad{b.deposit_reminder_count > 1 ? 'e' : ''}</span>
+                              <span className="text-amber-600"> · {b.deposit_reminder_count} anm.påm.</span>
+                            )}
+                            {!b.final_paid && remaining > 0 && b.final_reminder_count > 0 && (
+                              <span className="text-blue-600"> · {b.final_reminder_count} slutpåm.</span>
                             )}
                           </div>
                         </div>
@@ -1188,6 +1236,20 @@ export default function AdminPage() {
                           </span>
                           <span className="text-[10px] opacity-75">{remaining.toLocaleString('sv-SE')} kr</span>
                         </button>
+                        {!b.final_paid && remaining > 0 && (
+                          <button
+                            onClick={() => sendFinalReminder(b)}
+                            disabled={remindingId === b.id}
+                            title={b.final_reminder_count ? `${b.final_reminder_count} påminnelser skickade` : 'Skicka påminnelse om slutbetalning'}
+                            className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded-lg font-medium transition-colors min-w-[105px] bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-60"
+                          >
+                            {remindingId === b.id ? (
+                              <Spinner color="slate" />
+                            ) : (
+                              <><Send className="w-3 h-3" /> Påminn{b.final_reminder_count > 0 ? ` (${b.final_reminder_count})` : ''}</>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                     {editingElId === b.id ? (
