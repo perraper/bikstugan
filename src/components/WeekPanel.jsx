@@ -35,6 +35,7 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
 
   // Loaded data
   const [booking, setBooking] = useState(null)            // public.bookings row + user
+  const [electricity, setElectricity] = useState(null)    // electricity_readings row
   const [reserves, setReserves] = useState([])            // lottery_applications status='reserve' + user
   const [activeOffer, setActiveOffer] = useState(null)    // pending reserve_offer
   const [history, setHistory] = useState([])              // admin: legacy + bookings same week
@@ -77,7 +78,17 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
-            .then(({ data }) => setBooking(data))
+            .then(({ data }) => {
+              setBooking(data)
+              if (data?.id) {
+                supabase
+                  .from('electricity_readings')
+                  .select('id, booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
+                  .eq('booking_id', data.id)
+                  .maybeSingle()
+                  .then(({ data: el }) => setElectricity(el))
+              }
+            })
         )
 
         fetches.push(
@@ -1000,6 +1011,32 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
     setBusy(false)
   }
 
+  async function markFinalPaid() {
+    if (!booking) return
+    setBusy(true); setErr('')
+    const newPaid = !booking.final_paid
+    const { error } = await supabase
+      .from('bookings')
+      .update({ final_paid: newPaid, final_paid_at: newPaid ? new Date().toISOString() : null })
+      .eq('id', booking.id)
+    if (error) setErr(error.message)
+    else { setBooking({ ...booking, final_paid: newPaid }); await onAfterAction() }
+    setBusy(false)
+  }
+
+  async function toggleElectricityPaid() {
+    if (!electricity) return
+    setBusy(true); setErr('')
+    const newPaid = !electricity.electricity_paid
+    const { error } = await supabase
+      .from('electricity_readings')
+      .update({ electricity_paid: newPaid, electricity_paid_at: newPaid ? new Date().toISOString() : null })
+      .eq('id', electricity.id)
+    if (error) setErr(error.message)
+    else setElectricity({ ...electricity, electricity_paid: newPaid, electricity_paid_at: newPaid ? new Date().toISOString() : null })
+    setBusy(false)
+  }
+
   return (
     <div className="border border-slate-200 rounded-xl overflow-hidden">
       <button
@@ -1155,28 +1192,90 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
 
               {/* Betalningskort — slutbetalning */}
               {Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount)) > 0 && (() => {
-                const remaining = Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount))
+                const finalRemaining = Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount))
                 return (
                   <div className={`rounded-xl border p-3 space-y-2 ${booking.final_paid ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-700">Slutbetalning</span>
                       <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${booking.final_paid ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
-                        {booking.final_paid ? '✓ Betald' : `Obetald · ${remaining.toLocaleString('sv-SE')} kr`}
+                        {booking.final_paid ? '✓ Betald' : `Obetald · ${finalRemaining.toLocaleString('sv-SE')} kr`}
                       </span>
                     </div>
-                    {!booking.final_paid && (
-                      <button
-                        disabled={busy}
-                        onClick={sendFinalReminder}
-                        className="w-full text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
-                        title={booking.final_reminder_count ? `${booking.final_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
-                      >
-                        <Send className="w-3.5 h-3.5" /> Skicka påminnelse{booking.final_reminder_count > 0 ? ` (${booking.final_reminder_count})` : ''}
-                      </button>
-                    )}
+                    <div className="flex gap-2">
+                      {booking.final_paid ? (
+                        <button
+                          disabled={busy}
+                          onClick={markFinalPaid}
+                          className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-3 h-3" /> Ångra
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            disabled={busy}
+                            onClick={markFinalPaid}
+                            className="flex-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Markera betald
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={sendFinalReminder}
+                            className="flex-1 text-xs font-semibold bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                            title={booking.final_reminder_count ? `${booking.final_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
+                          >
+                            <Send className="w-3.5 h-3.5" /> Påminn{booking.final_reminder_count > 0 ? ` (${booking.final_reminder_count})` : ''}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )
               })()}
+
+              {/* Betalningskort — el */}
+              {electricity && electricity.end_kwh != null && (
+                <div className={`rounded-xl border p-3 space-y-2 ${electricity.electricity_paid ? 'bg-emerald-50 border-emerald-200' : 'bg-orange-50 border-orange-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5 text-orange-500" /> El
+                    </span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${electricity.electricity_paid ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-200 text-orange-800'}`}>
+                      {electricity.electricity_paid ? '✓ Betald' : `Obetald · ${Math.round(Number(electricity.cost || 0)).toLocaleString('sv-SE')} kr`}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    {electricity.start_kwh} → {electricity.end_kwh} kWh ({Math.max(0, electricity.end_kwh - electricity.start_kwh)} kWh)
+                  </div>
+                  <div className="flex gap-2">
+                    {electricity.electricity_paid ? (
+                      <button
+                        disabled={busy}
+                        onClick={toggleElectricityPaid}
+                        className="text-xs text-slate-500 hover:text-slate-700 flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Ångra
+                      </button>
+                    ) : (
+                      <button
+                        disabled={busy}
+                        onClick={toggleElectricityPaid}
+                        className="w-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Markera betald
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+              {electricity && electricity.end_kwh == null && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-3">
+                  <span className="text-xs text-orange-700 flex items-center gap-1">
+                    <Zap className="w-3.5 h-3.5" /> El påbörjad: {electricity.start_kwh} kWh — slutavläsning saknas
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
