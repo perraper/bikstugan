@@ -38,6 +38,7 @@ const AUDIT_LABELS = {
   'booking.final_reminder':           { label: 'Slutbet.påminnelse', tone: 'blue'  },
   'booking.edit_electricity':         { label: 'El-avläsning',     tone: 'amber'   },
   'booking.add_electricity':          { label: 'El-avläsning',     tone: 'amber'   },
+  'booking.delete':                   { label: 'Tog bort bokning', tone: 'red'     },
   'booking.mark_refunded':        { label: 'Återbetald (anm.)', tone: 'amber' },
   'booking.mark_final_refunded':  { label: 'Återbetald (slut)', tone: 'amber' },
   'user.approve':                 { label: 'Godkände',          tone: 'emerald' },
@@ -421,6 +422,27 @@ export default function AdminPage() {
         week_number: booking.week_number,
         before: { electricity_paid: r.electricity_paid },
         after: { electricity_paid: newPaid },
+      },
+    })
+  }
+
+  function deleteBooking(booking) {
+    setConfirmDialog({
+      title: `Ta bort V${booking.week_number}/${booking.year} – ${booking.user?.name || 'Okänd'}?`,
+      body: 'Bokningen, eventuell el-avläsning och betalningsinfo raderas permanent. Veckan återgår till ledig.',
+      confirmLabel: 'Ta bort bokning',
+      danger: true,
+      onConfirm: async () => {
+        const { error } = await supabase.rpc('delete_booking', { p_booking_id: booking.id })
+        if (!error) {
+          setAllBookings((prev) => prev.filter((b) => b.id !== booking.id))
+          logAdminAction('booking.delete', {
+            table: 'bookings',
+            id: booking.id,
+            details: { user_id: booking.user_id, year: booking.year, week_number: booking.week_number },
+          })
+        }
+        setConfirmDialog(null)
       },
     })
   }
@@ -1265,6 +1287,13 @@ export default function AdminPage() {
                             )}
                           </button>
                         )}
+                        <button
+                          onClick={() => deleteBooking(b)}
+                          title="Ta bort bokning"
+                          className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded-lg font-medium transition-colors min-w-[105px] text-slate-400 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-200"
+                        >
+                          <Trash2 className="w-3 h-3" /> Ta bort
+                        </button>
                       </div>
                     </div>
                     {editingElId === b.id ? (
