@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear, getCurrentIsoWeek, isLotteryPassed } from '../lib/weeks'
@@ -28,14 +28,19 @@ export default function CalendarPage() {
   const today = getCurrentIsoWeek()
   const currentWeekRef = useRef(null)
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  // Dit panelen ska återvända vid stängning (t.ex. '/admin' om man kom därifrån).
+  const [returnTo, setReturnTo] = useState(null)
 
   // Deep-link: öppna en specifik vecka via ?year=YYYY&week=NN (t.ex. från admin).
+  // Med &from=admin tar panelen dig tillbaka till adminsidan när den stängs.
   useEffect(() => {
     const w = searchParams.get('week')
     if (!w) return
     const y = searchParams.get('year')
     if (y) setYear(Number(y))
     setSelectedWeekNum(Number(w))
+    if (searchParams.get('from') === 'admin') setReturnTo('/admin')
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
 
@@ -225,6 +230,12 @@ export default function CalendarPage() {
 
   function closePanel(didMutate) {
     setSelectedWeekNum(null)
+    if (returnTo) {
+      const dest = returnTo
+      setReturnTo(null)
+      navigate(dest)
+      return
+    }
     if (didMutate) refetchAll()
   }
 

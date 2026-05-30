@@ -1058,7 +1058,7 @@ export default function AdminPage() {
                   >
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => navigate(`/?year=${b.year}&week=${b.week_number}`)}
+                        onClick={() => navigate(`/?year=${b.year}&week=${b.week_number}&from=admin`)}
                         title="Öppna bokningen i kalendern"
                         className="flex items-center gap-3 flex-1 min-w-0 text-left group"
                       >
