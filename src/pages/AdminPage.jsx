@@ -144,7 +144,7 @@ export default function AdminPage() {
   const [pendingUsers, setPendingUsers] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [editingElId, setEditingElId] = useState(null)
-  const [elDraft, setElDraft] = useState({ start: '', end: '' })
+  const [elDraft, setElDraft] = useState({ start: '', end: '', prevEnd: null })
   const [approvingId, setApprovingId] = useState(null)
   const [selectedMember, setSelectedMember] = useState(null)
   const [memberBookings, setMemberBookings] = useState([])
@@ -384,6 +384,21 @@ export default function AdminPage() {
         after: { start_kwh: startNum, end_kwh: endNum },
       },
     })
+  }
+
+  async function openNewElForm(booking) {
+    const { data } = await supabase
+      .from('electricity_readings')
+      .select('end_kwh, booking:bookings!booking_id(year, week_number)')
+      .not('end_kwh', 'is', null)
+    const thisKey = (booking.year || 0) * 100 + (booking.week_number || 0)
+    let bestKey = -Infinity, prevEnd = null
+    for (const r of data || []) {
+      const k = ((r.booking?.year || 0) * 100) + (r.booking?.week_number || 0)
+      if (k < thisKey && k > bestKey) { bestKey = k; prevEnd = r.end_kwh }
+    }
+    setEditingElId(booking.id)
+    setElDraft({ start: prevEnd != null ? String(prevEnd) : '', end: '', prevEnd })
   }
 
   async function toggleElectricityPaid(booking) {
@@ -1254,8 +1269,13 @@ export default function AdminPage() {
                     </div>
                     {editingElId === b.id ? (
                       <div className="mt-2 bg-amber-50/80 border border-amber-200 rounded px-2 py-2 space-y-2">
-                        <div className="flex items-center gap-1 text-[11px] font-medium text-amber-700">
-                          <Zap className="w-3 h-3" /> {b.electricity ? 'Redigera elavläsning' : 'Lägg till elavläsning'}
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="flex items-center gap-1 text-[11px] font-medium text-amber-700">
+                            <Zap className="w-3 h-3" /> {b.electricity ? 'Redigera elavläsning' : 'Lägg till elavläsning'}
+                          </span>
+                          {!b.electricity && elDraft.prevEnd != null && (
+                            <span className="text-[10px] text-amber-600">Föregående: {Number(elDraft.prevEnd).toLocaleString('sv-SE')} kWh</span>
+                          )}
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5">
                           <input
@@ -1310,7 +1330,7 @@ export default function AdminPage() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => { setEditingElId(b.id); setElDraft({ start: '', end: '' }) }}
+                        onClick={() => openNewElForm(b)}
                         className="mt-2 flex items-center gap-1 text-[11px] text-slate-400 hover:text-amber-600 transition-colors"
                       >
                         <Zap className="w-3 h-3" /> Lägg till elavläsning
