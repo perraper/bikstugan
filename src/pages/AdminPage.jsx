@@ -156,6 +156,7 @@ export default function AdminPage() {
   const [resentCount, setResentCount] = useState(null)
   const [allBookings, setAllBookings] = useState([])
   const [memberSearch, setMemberSearch] = useState('')
+  const [paymentFilter, setPaymentFilter] = useState('all')
   const [confirmDialog, setConfirmDialog] = useState(null)
   const [issues, setIssues] = useState([])
   const [issueFilter, setIssueFilter] = useState('open')
@@ -807,6 +808,26 @@ export default function AdminPage() {
   const unpaidFinals = allBookings.filter((b) => !b.final_paid && b.status === 'confirmed')
   const finalRemaining = (b) => Math.max(0, (b.price || 0) - (b.deposit_amount || PAYMENT.depositAmount))
 
+  // En bokning räknas som "obetald el" när det finns en färdig avläsning
+  // (slutvärde + kostnad) som ännu inte markerats betald.
+  const elUnpaid = (b) =>
+    b.electricity &&
+    b.electricity.end_kwh != null &&
+    Number(b.electricity.cost || 0) > 0 &&
+    !b.electricity.electricity_paid
+  const unpaidElectricity = allBookings.filter((b) => b.status === 'confirmed' && elUnpaid(b))
+
+  // Filterkriterier för betalningslistan
+  const bookingMatchesPaymentFilter = (b) => {
+    switch (paymentFilter) {
+      case 'deposit':     return !b.deposit_paid
+      case 'final':       return !b.final_paid && finalRemaining(b) > 0
+      case 'electricity': return elUnpaid(b)
+      case 'unpaid':      return !b.deposit_paid || !b.final_paid || elUnpaid(b)
+      default:            return true
+    }
+  }
+
   const refundsPending = allBookings.filter(
     (b) => b.status === 'cancelled' && b.deposit_paid && b.deposit_refundable === true
   )
@@ -962,23 +983,27 @@ export default function AdminPage() {
 
       {tab === 'payments' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-              <div className="text-xs text-emerald-700">Anm.avg betalda</div>
-              <div className="text-lg font-bold text-emerald-700">
-                {allBookings.filter((b) => b.deposit_paid && b.status === 'confirmed').length}
-              </div>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button
+              onClick={() => setPaymentFilter(paymentFilter === 'deposit' ? 'all' : 'deposit')}
+              className={`text-left bg-amber-50 border rounded-lg p-3 transition-colors ${
+                paymentFilter === 'deposit' ? 'border-amber-400 ring-2 ring-amber-200' : 'border-amber-200 hover:border-amber-300'
+              }`}
+            >
               <div className="text-xs text-amber-700">Obetalda anm.avg</div>
               <div className="text-lg font-bold text-amber-700">
                 {unpaidDeposits.length}
               </div>
               <div className="text-[11px] text-amber-600">
-                {unpaidDeposits.reduce((sum, b) => sum + (b.deposit_amount || PAYMENT.depositAmount), 0)} kr
+                {unpaidDeposits.reduce((sum, b) => sum + (b.deposit_amount || PAYMENT.depositAmount), 0).toLocaleString('sv-SE')} kr
               </div>
-            </div>
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            </button>
+            <button
+              onClick={() => setPaymentFilter(paymentFilter === 'final' ? 'all' : 'final')}
+              className={`text-left bg-slate-50 border rounded-lg p-3 transition-colors ${
+                paymentFilter === 'final' ? 'border-slate-400 ring-2 ring-slate-200' : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
               <div className="text-xs text-slate-500">Utestående slutbet.</div>
               <div className="text-lg font-bold text-slate-700">
                 {unpaidFinals.reduce((sum, b) => sum + finalRemaining(b), 0).toLocaleString('sv-SE')} kr
@@ -986,7 +1011,35 @@ export default function AdminPage() {
               <div className="text-[11px] text-slate-400">
                 {unpaidFinals.filter((b) => finalRemaining(b) > 0).length} bokningar
               </div>
-            </div>
+            </button>
+            <button
+              onClick={() => setPaymentFilter(paymentFilter === 'electricity' ? 'all' : 'electricity')}
+              className={`text-left bg-orange-50 border rounded-lg p-3 transition-colors ${
+                paymentFilter === 'electricity' ? 'border-orange-400 ring-2 ring-orange-200' : 'border-orange-200 hover:border-orange-300'
+              }`}
+            >
+              <div className="text-xs text-orange-700 flex items-center gap-1"><Zap className="w-3 h-3" /> Obetald el</div>
+              <div className="text-lg font-bold text-orange-700">
+                {unpaidElectricity.length}
+              </div>
+              <div className="text-[11px] text-orange-600">
+                {Math.round(unpaidElectricity.reduce((sum, b) => sum + Number(b.electricity?.cost || 0), 0)).toLocaleString('sv-SE')} kr
+              </div>
+            </button>
+            <button
+              onClick={() => setPaymentFilter(paymentFilter === 'unpaid' ? 'all' : 'unpaid')}
+              className={`text-left bg-emerald-50 border rounded-lg p-3 transition-colors ${
+                paymentFilter === 'unpaid' ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-emerald-200 hover:border-emerald-300'
+              }`}
+            >
+              <div className="text-xs text-emerald-700">Anm.avg betalda</div>
+              <div className="text-lg font-bold text-emerald-700">
+                {allBookings.filter((b) => b.deposit_paid && b.status === 'confirmed').length}
+              </div>
+              <div className="text-[11px] text-emerald-600">
+                {paymentFilter === 'unpaid' ? 'Visar obetalda' : 'Visa bara obetalda'}
+              </div>
+            </button>
           </div>
 
           {(refundsPending.length > 0 || finalRefundsPending.length > 0) && (
@@ -1035,13 +1088,39 @@ export default function AdminPage() {
           )}
 
           <div className="space-y-2">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Bokningar {year}</h2>
-            {allBookings.length === 0 ? (
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center text-slate-400 text-sm">
-                Inga bokningar för {year}.
-              </div>
-            ) : (
-              allBookings.filter((b) => b.status === 'confirmed').map((b) => {
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Bokningar {year}</h2>
+              {paymentFilter !== 'all' && (
+                <button
+                  onClick={() => setPaymentFilter('all')}
+                  className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full px-2 py-0.5 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  {paymentFilter === 'deposit' ? 'Obetald anm.avg' :
+                   paymentFilter === 'final' ? 'Utestående slutbet.' :
+                   paymentFilter === 'electricity' ? 'Obetald el' : 'Obetalda'}
+                </button>
+              )}
+            </div>
+            {(() => {
+              const visibleBookings = allBookings
+                .filter((b) => b.status === 'confirmed')
+                .filter(bookingMatchesPaymentFilter)
+              if (allBookings.length === 0) {
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center text-slate-400 text-sm">
+                    Inga bokningar för {year}.
+                  </div>
+                )
+              }
+              if (visibleBookings.length === 0) {
+                return (
+                  <div className="bg-emerald-50/60 border border-emerald-200 rounded-lg p-4 text-center text-emerald-600 text-sm">
+                    Inga bokningar matchar filtret – allt är betalt! 🎉
+                  </div>
+                )
+              }
+              return visibleBookings.map((b) => {
                 const dates = getWeekDateRange(b.year, b.week_number)
                 const fullyPaid = b.deposit_paid && b.final_paid
                 const remaining = finalRemaining(b)
@@ -1184,7 +1263,7 @@ export default function AdminPage() {
                   </div>
                 )
               })
-            )}
+            })()}
           </div>
         </div>
       )}
