@@ -35,7 +35,6 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
 
   // Loaded data
   const [booking, setBooking] = useState(null)            // public.bookings row + user
-  const [electricity, setElectricity] = useState(null)    // electricity_readings row
   const [reserves, setReserves] = useState([])            // lottery_applications status='reserve' + user
   const [activeOffer, setActiveOffer] = useState(null)    // pending reserve_offer
   const [history, setHistory] = useState([])              // admin: legacy + bookings same week
@@ -78,17 +77,7 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
-            .then(({ data }) => {
-              setBooking(data)
-              if (data?.id) {
-                supabase
-                  .from('electricity_readings')
-                  .select('id, booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
-                  .eq('booking_id', data.id)
-                  .maybeSingle()
-                  .then(({ data: el }) => setElectricity(el))
-              }
-            })
+            .then(({ data }) => setBooking(data))
         )
 
         fetches.push(
@@ -848,6 +837,8 @@ function LeaveReserveConfirm({ onCancel, onConfirm, loading }) {
 function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffer, onAfterAction }) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const [electricity, setElectricity] = useState(null)
+
   // Två separata formulär — ett för underhåll, ett för manuell bokning
   const [maintenanceName, setMaintenanceName] = useState('')
   const [maintenanceNote, setMaintenanceNote] = useState('')
@@ -856,6 +847,17 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
   const [manualName, setManualName] = useState('')
   const [manualNote, setManualNote] = useState('')
   const [manualFormOpen, setManualFormOpen] = useState(false)
+
+  // Hämta el-avläsning när bokning finns
+  useEffect(() => {
+    if (!booking?.id) { setElectricity(null); return }
+    supabase
+      .from('electricity_readings')
+      .select('id, booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
+      .eq('booking_id', booking.id)
+      .maybeSingle()
+      .then(({ data }) => setElectricity(data))
+  }, [booking?.id])
 
   const hasRealBooking = !!booking
   const existingMaintenance = week.isMaintenance ? week.legacyName : null
@@ -1020,7 +1022,7 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
       .update({ final_paid: newPaid, final_paid_at: newPaid ? new Date().toISOString() : null })
       .eq('id', booking.id)
     if (error) setErr(error.message)
-    else { setBooking({ ...booking, final_paid: newPaid }); await onAfterAction() }
+    else await onAfterAction()
     setBusy(false)
   }
 
@@ -1033,7 +1035,7 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
       .update({ electricity_paid: newPaid, electricity_paid_at: newPaid ? new Date().toISOString() : null })
       .eq('id', electricity.id)
     if (error) setErr(error.message)
-    else setElectricity({ ...electricity, electricity_paid: newPaid, electricity_paid_at: newPaid ? new Date().toISOString() : null })
+    else setElectricity({ ...electricity, electricity_paid: newPaid })
     setBusy(false)
   }
 
