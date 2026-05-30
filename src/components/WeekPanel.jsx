@@ -167,9 +167,12 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
     }
   }
 
+  // week.status ingår i deps: vid deep-link öppnas panelen innan kalenderns
+  // veckodata laddats, så status går från 'available' → 'booked' efteråt och
+  // bokningsdetaljerna måste hämtas om då.
   useEffect(() => {
     fetchData()
-  }, [week.week_number, year])
+  }, [week.week_number, year, week.status])
 
   function copyToClipboard(text, field) {
     navigator.clipboard?.writeText(text).then(() => {

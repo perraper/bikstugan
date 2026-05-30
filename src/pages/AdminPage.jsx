@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear } from '../lib/weeks'
@@ -126,6 +127,7 @@ function SortableApplicant({ app, index, isWinner }) {
 
 export default function AdminPage() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const [year, setYear] = useState(new Date().getFullYear())
   const [weeks, setWeeks] = useState([])
   const [lotteryWeeks, setLotteryWeeks] = useState([])
@@ -1047,21 +1049,27 @@ export default function AdminPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="text-xs font-bold text-slate-600 w-7 shrink-0">V{b.week_number}</div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-slate-700 truncate">
-                          {b.user?.name || 'Okänd'}
+                      <button
+                        onClick={() => navigate(`/?year=${b.year}&week=${b.week_number}`)}
+                        title="Öppna bokningen i kalendern"
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left group"
+                      >
+                        <div className="text-xs font-bold text-slate-600 w-7 shrink-0 group-hover:text-red-600 transition-colors">V{b.week_number}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-slate-700 truncate group-hover:text-red-600 transition-colors">
+                            {b.user?.name || 'Okänd'}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            {formatDateShort(dates.checkIn)} – {formatDateShort(dates.checkOut)} · {b.price} kr
+                            {!b.final_paid && remaining > 0 && (
+                              <span className="text-slate-500"> · kvar {remaining.toLocaleString('sv-SE')} kr</span>
+                            )}
+                            {!b.deposit_paid && b.deposit_reminder_count > 0 && (
+                              <span className="text-amber-600"> · {b.deposit_reminder_count} påm. skickad{b.deposit_reminder_count > 1 ? 'e' : ''}</span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-400 truncate">
-                          {formatDateShort(dates.checkIn)} – {formatDateShort(dates.checkOut)} · {b.price} kr
-                          {!b.final_paid && remaining > 0 && (
-                            <span className="text-slate-500"> · kvar {remaining.toLocaleString('sv-SE')} kr</span>
-                          )}
-                          {!b.deposit_paid && b.deposit_reminder_count > 0 && (
-                            <span className="text-amber-600"> · {b.deposit_reminder_count} påm. skickad{b.deposit_reminder_count > 1 ? 'e' : ''}</span>
-                          )}
-                        </div>
-                      </div>
+                      </button>
                       <div className="flex flex-col gap-1 shrink-0">
                         <button
                           onClick={() => toggleDepositPaid(b)}

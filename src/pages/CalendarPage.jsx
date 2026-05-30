@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear, getCurrentIsoWeek, isLotteryPassed } from '../lib/weeks'
@@ -26,6 +27,17 @@ export default function CalendarPage() {
   const totalWeeks = getWeeksForYear(year)
   const today = getCurrentIsoWeek()
   const currentWeekRef = useRef(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Deep-link: öppna en specifik vecka via ?year=YYYY&week=NN (t.ex. från admin).
+  useEffect(() => {
+    const w = searchParams.get('week')
+    if (!w) return
+    const y = searchParams.get('year')
+    if (y) setYear(Number(y))
+    setSelectedWeekNum(Number(w))
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
 
   async function fetchWeeks() {
     setLoading(true)
