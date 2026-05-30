@@ -1290,7 +1290,7 @@ export default function AdminPage() {
                         <button
                           onClick={() => deleteBooking(b)}
                           title="Ta bort bokning"
-                          className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded-lg font-medium transition-colors min-w-[105px] text-slate-400 hover:bg-red-50 hover:text-red-600 border border-transparent hover:border-red-200"
+                          className="flex items-center justify-center gap-1 text-[11px] px-2.5 py-1 rounded-lg font-medium transition-colors min-w-[105px] bg-red-50 text-red-500 hover:bg-red-100 hover:text-red-700 border border-red-200"
                         >
                           <Trash2 className="w-3 h-3" /> Ta bort
                         </button>
