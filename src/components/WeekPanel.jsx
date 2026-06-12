@@ -169,7 +169,7 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
 
   useEffect(() => {
     fetchData()
-  }, [week.week_number, year])
+  }, [week.week_number, week.status, week.isLegacy, year, profile?.id])
 
   function copyToClipboard(text, field) {
     navigator.clipboard?.writeText(text).then(() => {
@@ -936,6 +936,54 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
     setBusy(false)
   }
 
+  async function markFinalPaid() {
+    if (!booking) return
+    setBusy(true); setErr('')
+    const { error } = await supabase
+      .from('bookings')
+      .update({ final_paid: true, final_paid_at: new Date().toISOString() })
+      .eq('id', booking.id)
+    if (error) setErr(error.message)
+    else await onAfterAction()
+    setBusy(false)
+  }
+
+  async function markFinalUnpaid() {
+    if (!booking) return
+    setBusy(true); setErr('')
+    const { error } = await supabase
+      .from('bookings')
+      .update({ final_paid: false, final_paid_at: null })
+      .eq('id', booking.id)
+    if (error) setErr(error.message)
+    else await onAfterAction()
+    setBusy(false)
+  }
+
+  async function sendFinalReminder() {
+    if (!booking) return
+    setBusy(true); setErr('')
+    try {
+      await supabase.functions.invoke('send-email', {
+        body: {
+          type: 'final_reminder',
+          userId: booking.user_id,
+          weekNumber: week.week_number,
+          year,
+          extra: { reminderCount: (booking.final_reminder_count || 0) + 1 },
+        },
+      })
+      await supabase.from('bookings').update({
+        final_reminder_count: (booking.final_reminder_count || 0) + 1,
+        final_reminder_last_at: new Date().toISOString(),
+      }).eq('id', booking.id)
+      await onAfterAction()
+    } catch (e) {
+      setErr(e.message)
+    }
+    setBusy(false)
+  }
+
   return (
     <div className="border border-slate-200 rounded-lg overflow-hidden">
       <button
@@ -943,9 +991,9 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
         className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 transition-colors"
       >
         <span className="flex items-center gap-2 text-xs font-semibold text-slate-600 uppercase tracking-wide">
-          <Shield className="w-3.5 h-3.5" /> Admin
+          <Shield className="w-3.5 h-3.5 text-red-500" /> ADMINÅTGÄRDER
         </span>
-        <span className="text-xs text-slate-400">{open ? '−' : '+'}</span>
+        <span className="text-xs text-slate-400 font-bold">{open ? '−' : '+'}</span>
       </button>
 
       {open && (
@@ -956,7 +1004,7 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
 
           {/* Snabb status-toggle */}
           <div className="space-y-1.5 border-b border-slate-100 pb-3">
-            <div className="text-xs text-slate-400 uppercase tracking-wide">Status</div>
+            <div className="text-xs text-slate-400 uppercase tracking-wide">VECKANS STATUS</div>
             <div className="flex gap-1.5">
               {[
                 { key: 'available', label: 'Ledig', cls: 'bg-emerald-500 text-white', idle: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' },
@@ -1030,44 +1078,106 @@ function AdminSection({ open, setOpen, reserves, booking, week, year, activeOffe
           )}
 
           {booking && (
-            <div className="space-y-2 border-b border-slate-100 pb-3">
-              <div className="text-xs text-slate-400 uppercase tracking-wide">Bokning</div>
-              <div className="text-xs text-slate-600">
-                {booking.user?.name} ({booking.user?.email})
-                {booking.user?.phone && <> · {booking.user.phone}</>}
+            <div className="space-y-3 border-b border-slate-100 pb-3">
+              <div className="space-y-1">
+                <div className="text-xs text-slate-400 uppercase tracking-wide">Bokare</div>
+                <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                  <div className="text-sm font-semibold text-slate-800">{booking.user?.name || 'Okänd'}</div>
+                  <div className="text-xs text-blue-600 hover:underline">{booking.user?.email}</div>
+                  {booking.user?.phone && (
+                    <div className="text-xs text-slate-400 mt-0.5">{booking.user.phone}</div>
+                  )}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {booking.deposit_paid ? (
-                  <button
-                    disabled={busy}
-                    onClick={markDepositUnpaid}
-                    className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded flex items-center gap-1"
-                  >
-                    <RotateCcw className="w-3 h-3" /> Ångra "betald"
-                  </button>
-                ) : (
-                  <>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600">Anmälningsavgift</span>
+                  {booking.deposit_paid ? (
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">Betald</span>
+                  ) : (
+                    <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      Obetald - {booking.deposit_amount || PAYMENT.depositAmount} kr
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {booking.deposit_paid ? (
                     <button
                       disabled={busy}
-                      onClick={markDepositPaid}
-                      className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded flex items-center gap-1"
+                      onClick={markDepositUnpaid}
+                      className="flex-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 py-1.5 px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <Check className="w-3 h-3" /> Markera betald
+                      <RotateCcw className="w-3.5 h-3.5" /> Ångra betalning
                     </button>
+                  ) : (
+                    <>
+                      <button
+                        disabled={busy}
+                        onClick={markDepositPaid}
+                        className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Markera betald
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={sendReminder}
+                        className="flex-1 text-xs bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 py-1.5 px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
+                        title={booking.deposit_reminder_count ? `${booking.deposit_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
+                      >
+                        <Send className="w-3.5 h-3.5" /> Påminn
+                        {booking.deposit_reminder_count > 0 && ` (${booking.deposit_reminder_count})`}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600">Slutbetalning</span>
+                  {booking.final_paid ? (
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">Betald</span>
+                  ) : (
+                    <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      Obetald - {Math.max(0, (booking.price || 0) - (booking.deposit_amount || PAYMENT.depositAmount))} kr
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {booking.final_paid ? (
                     <button
                       disabled={busy}
-                      onClick={sendReminder}
-                      className="text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 px-2 py-1 rounded flex items-center gap-1"
-                      title={booking.deposit_reminder_count ? `${booking.deposit_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
+                      onClick={markFinalUnpaid}
+                      className="flex-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 py-1.5 px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
                     >
-                      <Send className="w-3 h-3" /> Skicka påminnelse
-                      {booking.deposit_reminder_count > 0 && ` (${booking.deposit_reminder_count})`}
+                      <RotateCcw className="w-3.5 h-3.5" /> Ångra betalning
                     </button>
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <button
+                        disabled={busy}
+                        onClick={markFinalPaid}
+                        className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Markera betald
+                      </button>
+                      <button
+                        disabled={busy}
+                        onClick={sendFinalReminder}
+                        className="flex-1 text-xs bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-800 py-1.5 px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 transition-colors"
+                        title={booking.final_reminder_count ? `${booking.final_reminder_count} påminnelser skickade` : 'Inga påminnelser skickade'}
+                      >
+                        <Send className="w-3.5 h-3.5" /> Påminn
+                        {booking.final_reminder_count > 0 && ` (${booking.final_reminder_count})`}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
+
               {booking.note && (
-                <div className="text-[11px] text-slate-500 italic bg-slate-50 rounded px-2 py-1">
+                <div className="text-[11px] text-slate-500 italic bg-slate-50 rounded-lg p-2.5 border border-slate-100">
                   Bokarens kommentar: "{booking.note}"
                 </div>
               )}

@@ -4,9 +4,12 @@ import { useAdmin } from '../../context/AdminContext'
 import { CalendarDays, Plus, Trash2, Wrench, Star, X } from 'lucide-react'
 import { formatDateShort } from '../../lib/weeks'
 import { useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export default function HistorikPage() {
   const { year } = useAdmin()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [legacyBookings, setLegacyBookings] = useState([])
   const [legacyForm, setLegacyForm] = useState(null)
   const [savingLegacy, setSavingLegacy] = useState(false)
@@ -137,7 +140,16 @@ export default function HistorikPage() {
               interest:    { bg: 'bg-purple-50/60',border: 'border-purple-200',icon: <Star className="w-3.5 h-3.5 text-purple-500" />,          label: 'Intresse' },
             }[b.type] || { bg: 'bg-white', border: 'border-slate-200', icon: null, label: null }
             return (
-              <div key={b.id} className={`border rounded-lg px-3 py-2 flex items-center gap-2.5 ${typeConfig.bg} ${typeConfig.border}`}>
+              <div
+                key={b.id}
+                onClick={(e) => {
+                  if (!e.target.closest('button')) {
+                    navigate(`/?year=${year}&week=${b.week_number}&from=${encodeURIComponent(location.pathname + location.search)}`)
+                  }
+                }}
+                className={`border rounded-lg px-3 py-2 flex items-center gap-2.5 cursor-pointer hover:shadow-sm transition-all ${typeConfig.bg} ${typeConfig.border}`}
+                title="Klicka för att visa på kalendersidan"
+              >
                 <div className="text-xs font-bold text-slate-500 w-7 shrink-0">V{b.week_number}</div>
                 {typeConfig.icon}
                 <div className="flex-1 min-w-0">

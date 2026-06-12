@@ -17,25 +17,27 @@ export default function Layout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [adminBadge, setAdminBadge] = useState(0)
 
-  // Hämta antal väntande användare + öppna felanmälningar för admin-badge
+  // Hämta antal väntande användare + öppna felanmälningar + obetalda depositioner för admin-badge
   useEffect(() => {
     if (profile?.role !== 'admin') return
 
     async function fetchBadgeCount() {
-      const [{ count: pendingCount }, { count: issueCount }] = await Promise.all([
-        supabase.from('users').select('id', { count: 'exact', head: true }).eq('approved', false),
+      const [{ count: pendingCount }, { count: issueCount }, { count: unpaidCount }] = await Promise.all([
+        supabase.from('users').select('id', { count: 'exact', head: true }).eq('approved', false).not('email', 'like', '%@deleted.local'),
         supabase.from('issues').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+        supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('deposit_paid', false).eq('status', 'confirmed'),
       ])
-      setAdminBadge((pendingCount ?? 0) + (issueCount ?? 0))
+      setAdminBadge((pendingCount ?? 0) + (issueCount ?? 0) + (unpaidCount ?? 0))
     }
 
     fetchBadgeCount()
 
-    // Realtime: uppdatera badge när users eller issues ändras
+    // Realtime: uppdatera badge när users, issues eller bookings ändras
     const channel = supabase
       .channel('admin-badge')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, fetchBadgeCount)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' }, fetchBadgeCount)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, fetchBadgeCount)
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -73,9 +75,7 @@ export default function Layout() {
                 <Icon className="w-4 h-4" />
                 {label}
                 {badge > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                    {badge > 99 ? '99+' : badge}
-                  </span>
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-600 rounded-full ring-2 ring-white" />
                 )}
               </Link>
             ))}
@@ -119,9 +119,7 @@ export default function Layout() {
                 <Icon className="w-4 h-4" />
                 {label}
                 {badge > 0 && (
-                  <span className="ml-auto min-w-[20px] h-5 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1.5">
-                    {badge > 99 ? '99+' : badge}
-                  </span>
+                  <span className="ml-auto w-2.5 h-2.5 bg-red-600 rounded-full" />
                 )}
               </Link>
             ))}

@@ -5,6 +5,7 @@ import { getWeeksForYear } from '../lib/weeks'
 import { PAYMENT } from '../lib/config'
 import { downloadCsv } from '../lib/backup'
 import { logAdminAction } from '../lib/audit'
+import { cancelBooking } from '../lib/booking-actions'
 
 const AdminContext = createContext(null)
 
@@ -56,21 +57,21 @@ export function AdminProvider({ children }) {
   async function fetchData() {
     const { data: weekData } = await supabase
       .from('weeks')
-      .select('*, booked_by:users(name, email)')
+      .select('*, booked_by:users(id, name, email, phone)')
       .eq('year', year)
       .order('week_number')
     setWeeks(weekData || [])
 
     const { data: appData } = await supabase
       .from('lottery_applications')
-      .select('*, user:users(name, email)')
+      .select('*, user:users(id, name, email, phone)')
       .eq('year', year)
       .order('week_number')
     setLotteryApps(appData || [])
 
     const { data: bookingData } = await supabase
       .from('bookings')
-      .select('*, user:users(name, email)')
+      .select('*, user:users(id, name, email, phone)')
       .eq('year', year)
       .order('week_number')
 
@@ -79,7 +80,7 @@ export function AdminProvider({ children }) {
     if (ids.length) {
       const { data: readingData } = await supabase
         .from('electricity_readings')
-        .select('booking_id, start_kwh, end_kwh, cost')
+        .select('booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
         .in('booking_id', ids)
       for (const r of readingData || []) readingMap[r.booking_id] = r
     }
@@ -243,6 +244,97 @@ export function AdminProvider({ children }) {
     })
   }
 
+  function cancelBookingAdmin(booking) {
+    setConfirmDialog({
+      title: `Avboka vecka ${booking.week_number} för ${booking.user?.name || 'medlem'}?`,
+      body: 'Mejl skickas till medlemmen. Om det finns reserver får den första i kön automatiskt ett erbjudande (48h).',
+      confirmLabel: 'Ja, avboka',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await cancelBooking({ profile, booking })
+          logAdminAction('booking.cancel', { table: 'bookings', id: booking.id, details: { user_id: booking.user_id, week_number: booking.week_number, year: booking.year } })
+          await fetchData()
+        } catch (err) {
+          alert('Kunde inte avboka: ' + err.message)
+        }
+        setConfirmDialog(null)
+      }
+    })
+  }
+
+  async function sendReminder(booking) {
+    try {
+      await supabase.functions.invoke('send-email', {
+        body: { type: 'deposit_reminder', userId: booking.user_id, weekNumber: booking.week_number, year: booking.year, extra: { reminderCount: (booking.deposit_reminder_count || 0) + 1 } }
+      })
+      await supabase.from('bookings').update({
+        deposit_reminder_count: (booking.deposit_reminder_count || 0) + 1,
+        deposit_reminder_last_at: new Date().toISOString()
+      }).eq('id', booking.id)
+      await fetchData()
+    } catch (e) {
+      alert('Kunde inte skicka påminnelse: ' + e.message)
+    }
+  }
+
+  async function saveElectricity(bookingId, startKwh, endKwh) {
+    const booking = allBookings.find((b) => b.id === bookingId)
+    const userId = booking?.user_id || null
+    if (!userId) {
+      alert('Kunde inte spara el: ingen bokning/medlem hittades')
+      return
+    }
+    const payload = { booking_id: bookingId, user_id: userId, start_kwh: startKwh, end_kwh: endKwh }
+    const { error } = await supabase.from('electricity_readings').upsert(payload, { onConflict: 'booking_id' })
+    if (error) alert('Kunde inte spara el: ' + error.message)
+    else fetchData()
+  }
+
+  async function toggleElectricityPaid(booking) {
+    if (!booking.electricity) return
+    const newPaid = !booking.electricity.electricity_paid
+    const newPaidAt = newPaid ? new Date().toISOString() : null
+
+    const { error } = await supabase
+      .from('electricity_readings')
+      .update({ electricity_paid: newPaid, electricity_paid_at: newPaidAt })
+      .eq('booking_id', booking.id)
+
+    if (error) {
+      alert('Kunde inte ändra el-betalning: ' + error.message)
+      return
+    }
+
+    setAllBookings((prev) =>
+      prev.map((b) =>
+        b.id === booking.id
+          ? {
+              ...b,
+              electricity: {
+                ...b.electricity,
+                electricity_paid: newPaid,
+                electricity_paid_at: newPaidAt,
+              },
+            }
+          : b
+      )
+    )
+
+    logAdminAction('electricity.toggle_paid', {
+      table: 'electricity_readings',
+      id: booking.electricity.id,
+      details: {
+        booking_id: booking.id,
+        user_id: booking.user_id,
+        year: booking.year,
+        week_number: booking.week_number,
+        before: { electricity_paid: booking.electricity.electricity_paid },
+        after: { electricity_paid: newPaid },
+      },
+    })
+  }
+
   async function showMemberBookings(user) {
     setSelectedMember(user)
     setEditForm(null)
@@ -258,7 +350,7 @@ export function AdminProvider({ children }) {
     if (ids.length) {
       const { data: readingData } = await supabase
         .from('electricity_readings')
-        .select('booking_id, start_kwh, end_kwh, cost')
+        .select('booking_id, start_kwh, end_kwh, cost, electricity_paid, electricity_paid_at')
         .in('booking_id', ids)
       for (const r of readingData || []) readingMap[r.booking_id] = r
     }
@@ -321,6 +413,7 @@ export function AdminProvider({ children }) {
       markRefunded, markFinalRefunded,
       showMemberBookings, startEditMember, saveMemberEdit,
       exportMembersCSV,
+      cancelBookingAdmin, sendReminder, saveElectricity, toggleElectricityPaid,
     }}>
       {children}
     </AdminContext.Provider>

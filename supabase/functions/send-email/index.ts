@@ -142,9 +142,10 @@ Deno.serve(async (req) => {
             <li>Utcheckning: ${welcomeDates.checkOut} kl 12:00</li>
             <li>6 sängplatser — självhushåll</li>
             <li>Ingen WiFi tillgänglig</li>
-            <li>Läs av elmätaren vid ankomst och avfärd</li>
+            <li>Läs av elmätaren vid ankomst och registrera startvärdet i appen under din bokning</li>
+            <li>Läs av elmätaren vid avfärd och registrera slutvärdet i appen</li>
             <li>Städa stugan innan avfärd</li>
-            <li>El debiteras extra: 2,50 kr/kWh — betalas till plusgiro <strong>${PAYMENT.plusgiro}</strong> (${PAYMENT.payee})</li>
+            <li>El debiteras med <strong>2,50 kr/kWh</strong> baserat på din registrerade avläsning — betalas till plusgiro <strong>${PAYMENT.plusgiro}</strong> (${PAYMENT.payee})</li>
           </ul>
           <p>Ha en fin vistelse!</p>
           <p>Mvh, BIK-stugan</p>

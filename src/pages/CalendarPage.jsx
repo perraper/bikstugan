@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear, getCurrentIsoWeek, isLotteryPassed } from '../lib/weeks'
@@ -14,18 +15,39 @@ const STATUS_CONFIG = {
 
 export default function CalendarPage() {
   const { profile } = useAuth()
-  const [year, setYear] = useState(new Date().getFullYear())
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const paramYear = searchParams.get('year')
+  const paramWeek = searchParams.get('week')
+
+  const [year, setYear] = useState(() => {
+    return paramYear ? Number(paramYear) : new Date().getFullYear()
+  })
   const [weeks, setWeeks] = useState([])
   const [legacyMap, setLegacyMap] = useState({})
   const [lotteryApps, setLotteryApps] = useState([])
   const [visibleNameWeeks, setVisibleNameWeeks] = useState(new Set())
   const [loading, setLoading] = useState(true)
-  const [selectedWeekNum, setSelectedWeekNum] = useState(null)
+  const [selectedWeekNum, setSelectedWeekNum] = useState(() => {
+    return paramWeek ? Number(paramWeek) : null
+  })
   const [filter, setFilter] = useState('all')
 
   const totalWeeks = getWeeksForYear(year)
   const today = getCurrentIsoWeek()
   const currentWeekRef = useRef(null)
+  const selectedWeekRef = useRef(null)
+
+  useEffect(() => {
+    const y = searchParams.get('year')
+    const w = searchParams.get('week')
+    if (y) setYear(Number(y))
+    if (w) {
+      setSelectedWeekNum(Number(w))
+    } else {
+      setSelectedWeekNum(null)
+    }
+  }, [searchParams])
 
   async function fetchWeeks() {
     setLoading(true)
@@ -122,10 +144,14 @@ export default function CalendarPage() {
   }, [year])
 
   useEffect(() => {
-    if (!loading && year === today.year && currentWeekRef.current) {
-      currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (!loading) {
+      if (selectedWeekNum && selectedWeekRef.current) {
+        selectedWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else if (year === today.year && currentWeekRef.current) {
+        currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
     }
-  }, [loading, year])
+  }, [loading, year, selectedWeekNum])
 
   function getWeekData(weekNum) {
     const dbWeek = weeks.find((w) => w.week_number === weekNum)
@@ -192,6 +218,18 @@ export default function CalendarPage() {
 
   function handleWeekClick(weekNum) {
     setSelectedWeekNum(weekNum)
+    setSearchParams((prev) => {
+      prev.set('week', String(weekNum))
+      return prev
+    }, { replace: true })
+  }
+
+  function handleYearChange(newYear) {
+    setYear(newYear)
+    setSearchParams((prev) => {
+      prev.set('year', String(newYear))
+      return prev
+    }, { replace: true })
   }
 
   const statusCounts = useMemo(() => {
@@ -213,6 +251,15 @@ export default function CalendarPage() {
 
   function closePanel(didMutate) {
     setSelectedWeekNum(null)
+    const fromPath = searchParams.get('from')
+    if (fromPath) {
+      navigate(fromPath)
+    } else {
+      setSearchParams((prev) => {
+        prev.delete('week')
+        return prev
+      }, { replace: true })
+    }
     if (didMutate) refetchAll()
   }
 
@@ -234,7 +281,7 @@ export default function CalendarPage() {
 
     return (
       <button
-        ref={isCurrent ? currentWeekRef : null}
+        ref={selectedWeekNum === weekNum ? selectedWeekRef : (isCurrent ? currentWeekRef : null)}
         onClick={() => isClickable && handleWeekClick(weekNum)}
         disabled={!isClickable}
         className={`${cfg.bg} ${cfg.border} border rounded-xl text-left transition-all relative ${
@@ -301,11 +348,11 @@ export default function CalendarPage() {
         </div>
 
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-          <button onClick={() => setYear(year - 1)} className="p-1 hover:bg-slate-200 rounded transition-colors">
+          <button onClick={() => handleYearChange(year - 1)} className="p-1 hover:bg-slate-200 rounded transition-colors">
             <ChevronLeft className="w-4 h-4 text-slate-500" />
           </button>
           <span className="text-sm font-semibold text-slate-700 w-12 text-center">{year}</span>
-          <button onClick={() => setYear(year + 1)} className="p-1 hover:bg-slate-200 rounded transition-colors">
+          <button onClick={() => handleYearChange(year + 1)} className="p-1 hover:bg-slate-200 rounded transition-colors">
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </button>
         </div>

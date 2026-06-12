@@ -1,4 +1,4 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { AdminProvider, useAdmin } from '../../context/AdminContext'
 import {
   Settings, ChevronLeft, ChevronRight, CreditCard, Bug,
@@ -94,6 +94,9 @@ function MemberModal() {
     startEditMember, saveMemberEdit,
   } = useAdmin()
 
+  const navigate = useNavigate()
+  const location = useLocation()
+
   if (!selectedMember) return null
 
   return (
@@ -180,9 +183,16 @@ function MemberModal() {
               return (
                 <div
                   key={b.id}
-                  className={`border rounded-lg px-3 py-2 space-y-1 ${
-                    b.status === 'confirmed' ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-slate-50'
+                  onClick={() => {
+                    setSelectedMember(null)
+                    navigate(`/?year=${b.year}&week=${b.week_number}&from=${encodeURIComponent(location.pathname + location.search)}`)
+                  }}
+                  className={`border rounded-lg px-3 py-2 space-y-1 cursor-pointer hover:shadow-sm hover:scale-[1.01] transition-all ${
+                    b.status === 'confirmed' 
+                      ? 'border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100/30' 
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100'
                   }`}
+                  title="Klicka för att visa på kalendersidan"
                 >
                   <div className="flex items-center justify-between">
                     <div>
