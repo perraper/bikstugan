@@ -1,0 +1,328 @@
+import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from './useAuth'
+import { getWeeksForYear } from '../lib/weeks'
+import { PAYMENT } from '../lib/config'
+import { downloadCsv } from '../lib/backup'
+import { logAdminAction } from '../lib/audit'
+
+const AdminContext = createContext(null)
+
+export function useAdmin() {
+  return useContext(AdminContext)
+}
+
+export function AdminProvider({ children }) {
+  const { profile } = useAuth()
+  const [year, setYear] = useState(new Date().getFullYear())
+  const [weeks, setWeeks] = useState([])
+  const [allBookings, setAllBookings] = useState([])
+  const [lotteryApps, setLotteryApps] = useState([])
+  const [pendingUsers, setPendingUsers] = useState([])
+  const [allUsers, setAllUsers] = useState([])
+  const [approvingId, setApprovingId] = useState(null)
+  const [selectedMember, setSelectedMember] = useState(null)
+  const [memberBookings, setMemberBookings] = useState([])
+  const [editForm, setEditForm] = useState(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editError, setEditError] = useState(null)
+  const [confirmDialog, setConfirmDialog] = useState(null)
+  const [openIssuesCount, setOpenIssuesCount] = useState(0)
+
+  const totalWeeks = getWeeksForYear(year)
+
+  useEffect(() => {
+    fetchData()
+    fetchPendingUsers()
+  }, [year])
+
+  useEffect(() => {
+    fetchOpenIssuesCount()
+    const channel = supabase
+      .channel('admin-issues-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' }, fetchOpenIssuesCount)
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  async function fetchOpenIssuesCount() {
+    const { count } = await supabase
+      .from('issues')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'open')
+    setOpenIssuesCount(count ?? 0)
+  }
+
+  async function fetchData() {
+    const { data: weekData } = await supabase
+      .from('weeks')
+      .select('*, booked_by:users(name, email)')
+      .eq('year', year)
+      .order('week_number')
+    setWeeks(weekData || [])
+
+    const { data: appData } = await supabase
+      .from('lottery_applications')
+      .select('*, user:users(name, email)')
+      .eq('year', year)
+      .order('week_number')
+    setLotteryApps(appData || [])
+
+    const { data: bookingData } = await supabase
+      .from('bookings')
+      .select('*, user:users(name, email)')
+      .eq('year', year)
+      .order('week_number')
+
+    const ids = (bookingData || []).map((b) => b.id)
+    let readingMap = {}
+    if (ids.length) {
+      const { data: readingData } = await supabase
+        .from('electricity_readings')
+        .select('booking_id, start_kwh, end_kwh, cost')
+        .in('booking_id', ids)
+      for (const r of readingData || []) readingMap[r.booking_id] = r
+    }
+    setAllBookings((bookingData || []).map((b) => ({ ...b, electricity: readingMap[b.id] || null })))
+  }
+
+  const isDeleted = (u) => u.email?.endsWith('@deleted.local')
+
+  async function fetchPendingUsers() {
+    const { data, error } = await supabase.rpc('get_admin_users_with_auth')
+    if (error) {
+      const [{ data: pending }, { data: all }] = await Promise.all([
+        supabase.from('users').select('*').eq('approved', false).order('created_at', { ascending: true }),
+        supabase.from('users').select('*').eq('approved', true).order('name'),
+      ])
+      setPendingUsers((pending || []).filter((u) => !isDeleted(u)))
+      setAllUsers((all || []).filter((u) => !isDeleted(u)))
+      return
+    }
+    const rows = (data || []).filter((u) => !isDeleted(u))
+    setPendingUsers(
+      rows.filter((u) => !u.approved).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    )
+    setAllUsers(
+      rows.filter((u) => u.approved).sort((a, b) => {
+        if (a.role !== b.role) return a.role === 'admin' ? -1 : 1
+        return a.name.localeCompare(b.name, 'sv')
+      })
+    )
+  }
+
+  function finalRemaining(b) {
+    return Math.max(0, (b.price || 0) - (b.deposit_amount || PAYMENT.depositAmount))
+  }
+
+  function formatLastSignIn(ts) {
+    if (!ts) return 'Aldrig inloggad'
+    const date = new Date(ts)
+    const diffMs = Date.now() - date.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return 'just nu'
+    if (diffMin < 60) return `${diffMin} min sedan`
+    const diffHours = Math.floor(diffMin / 60)
+    if (diffHours < 24) return `${diffHours} h sedan`
+    const diffDays = Math.floor(diffHours / 24)
+    if (diffDays === 1) return 'i går'
+    if (diffDays < 30) return `${diffDays} dagar sedan`
+    const diffMonths = Math.floor(diffDays / 30)
+    if (diffMonths < 12) return `${diffMonths} mån sedan`
+    return date.toLocaleDateString('sv-SE')
+  }
+
+  async function toggleDepositPaid(booking) {
+    const newPaid = !booking.deposit_paid
+    const newPaidAt = newPaid ? new Date().toISOString() : null
+    await supabase
+      .from('bookings')
+      .update({ deposit_paid: newPaid, deposit_paid_at: newPaidAt })
+      .eq('id', booking.id)
+    setAllBookings((prev) =>
+      prev.map((b) => b.id === booking.id ? { ...b, deposit_paid: newPaid, deposit_paid_at: newPaidAt } : b)
+    )
+    logAdminAction('booking.toggle_deposit_paid', {
+      table: 'bookings', id: booking.id,
+      details: { user_id: booking.user_id, year: booking.year, week_number: booking.week_number, before: { deposit_paid: booking.deposit_paid }, after: { deposit_paid: newPaid } },
+    })
+  }
+
+  async function toggleFinalPaid(booking) {
+    const newPaid = !booking.final_paid
+    const newPaidAt = newPaid ? new Date().toISOString() : null
+    await supabase
+      .from('bookings')
+      .update({ final_paid: newPaid, final_paid_at: newPaidAt })
+      .eq('id', booking.id)
+    setAllBookings((prev) =>
+      prev.map((b) => b.id === booking.id ? { ...b, final_paid: newPaid, final_paid_at: newPaidAt } : b)
+    )
+    logAdminAction('booking.toggle_final_paid', {
+      table: 'bookings', id: booking.id,
+      details: { user_id: booking.user_id, year: booking.year, week_number: booking.week_number, before: { final_paid: booking.final_paid }, after: { final_paid: newPaid } },
+    })
+  }
+
+  async function approveUser(userId) {
+    setApprovingId(userId)
+    await supabase.from('users').update({ approved: true }).eq('id', userId)
+    logAdminAction('user.approve', { table: 'users', id: userId })
+    fetchPendingUsers()
+    setApprovingId(null)
+  }
+
+  function rejectUser(user) {
+    setConfirmDialog({
+      title: `Avvisa ${user.name}?`,
+      body: 'Kontot raderas permanent och kan inte återskapas.',
+      confirmLabel: 'Avvisa',
+      danger: true,
+      onConfirm: async () => {
+        setApprovingId(user.id)
+        await supabase.from('users').delete().eq('id', user.id)
+        logAdminAction('user.reject', { table: 'users', id: user.id, details: { name: user.name, email: user.email } })
+        setPendingUsers((prev) => prev.filter((u) => u.id !== user.id))
+        setApprovingId(null)
+        setConfirmDialog(null)
+      },
+    })
+  }
+
+  async function toggleAdmin(userId, currentRole) {
+    const newRole = currentRole === 'admin' ? 'member' : 'admin'
+    await supabase.from('users').update({ role: newRole }).eq('id', userId)
+    setAllUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u))
+    logAdminAction('user.toggle_admin', {
+      table: 'users', id: userId,
+      details: { before: { role: currentRole }, after: { role: newRole } },
+    })
+  }
+
+  function deleteMember(user) {
+    if (user.id === profile?.id) return
+    setConfirmDialog({
+      title: `Ta bort ${user.name}?`,
+      body: 'Kontot anonymiseras (kan inte logga in mer). Bokningar och historik bevaras men visas som "Borttagen medlem".',
+      confirmLabel: 'Ta bort',
+      danger: true,
+      onConfirm: async () => {
+        setApprovingId(user.id)
+        const { error } = await supabase.rpc('delete_member', { target_user_id: user.id })
+        if (error) {
+          alert('Kunde inte ta bort medlemmen: ' + error.message)
+        } else {
+          logAdminAction('user.delete', { table: 'users', id: user.id, details: { name: user.name, email: user.email } })
+          await fetchPendingUsers()
+        }
+        setApprovingId(null)
+        setConfirmDialog(null)
+      },
+    })
+  }
+
+  async function markRefunded(booking) {
+    await supabase.from('bookings').update({ deposit_refundable: false, deposit_paid: false }).eq('id', booking.id)
+    setAllBookings((prev) =>
+      prev.map((b) => b.id === booking.id ? { ...b, deposit_refundable: false, deposit_paid: false } : b)
+    )
+    logAdminAction('booking.mark_refunded', {
+      table: 'bookings', id: booking.id,
+      details: { user_id: booking.user_id, year: booking.year, week_number: booking.week_number },
+    })
+  }
+
+  async function markFinalRefunded(booking) {
+    await supabase.from('bookings').update({ final_refundable: false, final_paid: false }).eq('id', booking.id)
+    setAllBookings((prev) =>
+      prev.map((b) => b.id === booking.id ? { ...b, final_refundable: false, final_paid: false } : b)
+    )
+    logAdminAction('booking.mark_final_refunded', {
+      table: 'bookings', id: booking.id,
+      details: { user_id: booking.user_id, year: booking.year, week_number: booking.week_number },
+    })
+  }
+
+  async function showMemberBookings(user) {
+    setSelectedMember(user)
+    setEditForm(null)
+    setEditError(null)
+    const { data } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('year', { ascending: false })
+      .order('week_number', { ascending: false })
+    const ids = (data || []).map((b) => b.id)
+    let readingMap = {}
+    if (ids.length) {
+      const { data: readingData } = await supabase
+        .from('electricity_readings')
+        .select('booking_id, start_kwh, end_kwh, cost')
+        .in('booking_id', ids)
+      for (const r of readingData || []) readingMap[r.booking_id] = r
+    }
+    setMemberBookings((data || []).map((b) => ({ ...b, electricity: readingMap[b.id] || null })))
+  }
+
+  function startEditMember() {
+    if (!selectedMember) return
+    setEditForm({ name: selectedMember.name || '', email: selectedMember.email || '', phone: selectedMember.phone || '' })
+    setEditError(null)
+  }
+
+  async function saveMemberEdit() {
+    if (!selectedMember || !editForm) return
+    setSavingEdit(true)
+    setEditError(null)
+    const payload = { userId: selectedMember.id }
+    const before = {}
+    const after = {}
+    if (editForm.name !== selectedMember.name) { payload.name = editForm.name; before.name = selectedMember.name; after.name = editForm.name }
+    if (editForm.email !== selectedMember.email) { payload.email = editForm.email; before.email = selectedMember.email; after.email = editForm.email }
+    if ((editForm.phone || '') !== (selectedMember.phone || '')) { payload.phone = editForm.phone; before.phone = selectedMember.phone || null; after.phone = editForm.phone || null }
+    if (Object.keys(payload).length === 1) { setEditForm(null); setSavingEdit(false); return }
+    const { data, error } = await supabase.functions.invoke('admin-update-user', { body: payload })
+    if (error || data?.error) { setEditError(data?.error || error.message); setSavingEdit(false); return }
+    const updated = { ...selectedMember, ...payload }
+    delete updated.userId
+    setSelectedMember(updated)
+    setAllUsers((prev) => prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u)))
+    logAdminAction('user.edit', { table: 'users', id: selectedMember.id, details: { before, after } })
+    setEditForm(null)
+    setSavingEdit(false)
+  }
+
+  function exportMembersCSV() {
+    const headers = ['Namn', 'E-post', 'Telefon', 'Roll']
+    const rows = allUsers.map((u) => [u.name, u.email, u.phone || '', u.role])
+    downloadCsv(`medlemmar-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows)
+  }
+
+  return (
+    <AdminContext.Provider value={{
+      year, setYear,
+      weeks, totalWeeks,
+      allBookings, setAllBookings,
+      lotteryApps,
+      pendingUsers, allUsers,
+      approvingId,
+      openIssuesCount,
+      selectedMember, setSelectedMember,
+      memberBookings,
+      editForm, setEditForm,
+      savingEdit, editError,
+      confirmDialog, setConfirmDialog,
+      finalRemaining, formatLastSignIn,
+      fetchData, fetchPendingUsers,
+      toggleDepositPaid, toggleFinalPaid,
+      approveUser, rejectUser,
+      toggleAdmin, deleteMember,
+      markRefunded, markFinalRefunded,
+      showMemberBookings, startEditMember, saveMemberEdit,
+      exportMembersCSV,
+    }}>
+      {children}
+    </AdminContext.Provider>
+  )
+}

@@ -9,7 +9,14 @@ const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const CalendarPage = lazy(() => import('./pages/CalendarPage'))
 const BookingsPage = lazy(() => import('./pages/BookingsPage'))
 const ElectricityPage = lazy(() => import('./pages/ElectricityPage'))
-const AdminPage = lazy(() => import('./pages/AdminPage'))
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
+const BetalningarPage = lazy(() => import('./pages/admin/BetalningarPage'))
+const FelanmaelningarPage = lazy(() => import('./pages/admin/FelanmaelningarPage'))
+const LottningPage = lazy(() => import('./pages/admin/LottningPage'))
+const MedlemmarPage = lazy(() => import('./pages/admin/MedlemmarPage'))
+const StatistikPage = lazy(() => import('./pages/admin/StatistikPage'))
+const HistorikPage = lazy(() => import('./pages/admin/HistorikPage'))
+const LoggPage = lazy(() => import('./pages/admin/LoggPage'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 const IssuesPage = lazy(() => import('./pages/IssuesPage'))
 
@@ -97,14 +104,16 @@ export default function App() {
               <Route path="electricity" element={<ElectricityPage />} />
               <Route path="issues" element={<IssuesPage />} />
               <Route path="profile" element={<ProfilePage />} />
-              <Route
-                path="admin"
-                element={
-                  <AdminRoute>
-                    <AdminPage />
-                  </AdminRoute>
-                }
-              />
+              <Route path="admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+                <Route index element={<Navigate to="payments" replace />} />
+                <Route path="payments" element={<BetalningarPage />} />
+                <Route path="issues" element={<FelanmaelningarPage />} />
+                <Route path="lottery" element={<LottningPage />} />
+                <Route path="members" element={<MedlemmarPage />} />
+                <Route path="stats" element={<StatistikPage />} />
+                <Route path="history" element={<HistorikPage />} />
+                <Route path="audit" element={<LoggPage />} />
+              </Route>
             </Route>
           </Routes>
         </Suspense>
