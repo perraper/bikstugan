@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getSeasonPrice, getWeekDateRange, formatDateShort, getWeeksForYear } from '../lib/weeks'
@@ -126,7 +127,9 @@ export default function AdminPage() {
   const [draftResults, setDraftResults] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
-  const [tab, setTab] = useState('payments')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') || 'payments'
+  function setTab(key) { setSearchParams({ tab: key }, { replace: true }) }
   const [pendingUsers, setPendingUsers] = useState([])
   const [allUsers, setAllUsers] = useState([])
   const [approvingId, setApprovingId] = useState(null)
@@ -861,6 +864,7 @@ export default function AdminPage() {
       </div>
 
       {/* Tabs */}
+      <div className="sticky top-14 z-40 -mx-4 px-4 pt-2 pb-2 bg-white/95 backdrop-blur-sm border-b border-slate-200">
       <div className="flex gap-1 bg-slate-100 border border-slate-200 rounded-lg p-1 flex-wrap">
         {[
           { key: 'payments', label: `Betalningar${unpaidDeposits.length ? ` (${unpaidDeposits.length})` : ''}` },
@@ -881,6 +885,7 @@ export default function AdminPage() {
             {t.label}
           </button>
         ))}
+      </div>
       </div>
 
       {/* Stats */}
