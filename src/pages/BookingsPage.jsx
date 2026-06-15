@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getWeekDateRange, formatDateLong, getSeasonPrice } from '../lib/weeks'
@@ -91,6 +92,7 @@ export default function BookingsPage() {
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile])
 
   async function handleCancel(booking) {
@@ -157,6 +159,7 @@ export default function BookingsPage() {
           {reserveOffers.map((offer) => {
             const dates = getWeekDateRange(offer.year, offer.week_number)
             const deadline = new Date(offer.deadline)
+             
             const hoursLeft = Math.max(0, Math.round((deadline - Date.now()) / 3600000))
             return (
               <div key={offer.id} className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3 shadow-sm">
@@ -203,8 +206,22 @@ export default function BookingsPage() {
           )}
         </div>
         {bookings.length === 0 ? (
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">
-            Du har inga bekräftade bokningar ännu.
+          <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+              <CalendarCheck className="w-6 h-6 text-slate-400" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-slate-700">Inga bokningar ännu</h3>
+              <p className="text-xs text-slate-400 max-w-xs">
+                Du har inga bekräftade bokningar för tillfället. Gå till kalendern för att hitta en ledig vecka eller anmäla dig till lottningen.
+              </p>
+            </div>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors mt-2"
+            >
+              Gå till kalendern och boka din vecka →
+            </Link>
           </div>
         ) : (
           bookings.map((b) => {

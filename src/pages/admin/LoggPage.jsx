@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { ChevronRight, RotateCcw } from 'lucide-react'
 
@@ -61,11 +61,7 @@ export default function LoggPage() {
   const [auditLoading, setAuditLoading] = useState(false)
   const [expandedAuditId, setExpandedAuditId] = useState(null)
 
-  useEffect(() => {
-    fetchAuditLog()
-  }, [])
-
-  async function fetchAuditLog() {
+  const fetchAuditLog = useCallback(async () => {
     setAuditLoading(true)
     const { data } = await supabase
       .from('admin_audit_log')
@@ -74,7 +70,11 @@ export default function LoggPage() {
       .limit(100)
     setAuditLog(data || [])
     setAuditLoading(false)
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchAuditLog() // eslint-disable-line react-hooks/set-state-in-effect
+  }, [fetchAuditLog])
 
   return (
     <div className="space-y-3">

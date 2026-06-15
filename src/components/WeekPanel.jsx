@@ -13,7 +13,7 @@ import {
 import {
   X, Clock, Bed, Zap, AlertTriangle, CreditCard, Copy, Check, MessageSquare,
   CalendarCheck, CheckCircle2, Ticket, Users, Star, Pencil, Save, History,
-  Shield, Trash2, RotateCcw, Send, Shuffle, Wrench,
+  Shield, Trash2, RotateCcw, Send, Shuffle, Wrench, Info,
 } from 'lucide-react'
 import Spinner from './Spinner'
 import CancelBookingConfirm from './CancelBookingConfirm'
@@ -31,6 +31,7 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
 
   const [error, setError] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
+  const [localLoading, setLocalLoading] = useState(true)
   const [view, setView] = useState('main') // main | confirm-cancel | confirm-leave-reserve
 
   // Loaded data
@@ -63,6 +64,7 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
   const isOthersBooking = isBooked && !isOwnBooking
 
   async function fetchData() {
+    setLocalLoading(true)
     try {
       const fetches = []
 
@@ -164,11 +166,14 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
       await Promise.all(fetches)
     } catch (e) {
       console.error(e)
+    } finally {
+      setLocalLoading(false)
     }
   }
 
   useEffect(() => {
     fetchData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [week.week_number, week.status, week.isLegacy, year, profile?.id])
 
   function copyToClipboard(text, field) {
@@ -325,100 +330,107 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
               {/* Period & lottningsdatum */}
               <PeriodInfo year={year} weekNumber={week.week_number} />
 
-
-              {/* === LEDIG === */}
-              {isAvailable && (
-                <BookSection
-                  season={season}
-                  remaining={remaining}
-                  bookNote={bookNote}
-                  setBookNote={setBookNote}
-                  agreed={agreed}
-                  setAgreed={setAgreed}
-                  loading={actionLoading}
-                  onBook={handleBook}
-                />
-              )}
-
-              {/* === LOTTNING === */}
-              {isLottery && (
-                <LotterySection
-                  season={season}
-                  applied={!!ownLotteryApp}
-                  loading={actionLoading}
-                  onApply={handleLottery}
-                />
-              )}
-
-              {/* === UNDERHÅLL === */}
-              {isMaintenance && (
-                <div className="bg-stone-100 border border-stone-300 rounded-lg p-4 space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium text-stone-700">
-                    <Wrench className="w-4 h-4 text-amber-500" />
-                    Underhåll / renovering
-                  </div>
-                  {week.legacyName && (
-                    <div className="text-sm text-stone-600">{week.legacyName}</div>
-                  )}
-                  <p className="text-xs text-stone-500">
-                    Veckan är blockerad för arbete och kan inte bokas.
-                  </p>
+              {localLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <Spinner className="w-6 h-6 text-slate-400" />
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* === LEDIG === */}
+                  {isAvailable && (
+                    <BookSection
+                      season={season}
+                      remaining={remaining}
+                      bookNote={bookNote}
+                      setBookNote={setBookNote}
+                      agreed={agreed}
+                      setAgreed={setAgreed}
+                      loading={actionLoading}
+                      onBook={handleBook}
+                    />
+                  )}
 
-              {/* === BOKAD === */}
-              {isBooked && (
-                <BookedSection
-                  isOwnBooking={isOwnBooking}
-                  isOthersBooking={isOthersBooking}
-                  isLegacy={isLegacy}
-                  canSeeBookerName={canSeeBookerName}
-                  bookerName={bookerName}
-                  booking={booking}
-                  reserveCount={reserves.length}
-                  ownReserve={ownReserve}
-                  ownReserveRank={ownLotteryApp?.reserve_rank}
-                  activeOffer={activeOffer}
-                  actionLoading={actionLoading}
-                  editingNote={editingNote}
-                  noteDraft={noteDraft}
-                  setEditingNote={setEditingNote}
-                  setNoteDraft={setNoteDraft}
-                  onSaveNote={saveNote}
-                  onCancelBooking={() => setView('confirm-cancel')}
-                  onJoinReserve={handleJoinReserve}
-                  onLeaveReserve={() => setView('confirm-leave-reserve')}
-                  copiedField={copiedField}
-                  onCopy={copyToClipboard}
-                  paymentRef={booking ? paymentReference(booking.user, year, week.week_number) : ''}
-                />
-              )}
+                  {/* === LOTTNING === */}
+                  {isLottery && (
+                    <LotterySection
+                      season={season}
+                      applied={!!ownLotteryApp}
+                      loading={actionLoading}
+                      onApply={handleLottery}
+                    />
+                  )}
 
-              {/* === ADMIN-SEKTION === */}
-              {isAdmin && (
-                <AdminSection
-                  open={adminOpen}
-                  setOpen={setAdminOpen}
-                  reserves={reserves}
-                  booking={booking}
-                  week={week}
-                  year={year}
-                  activeOffer={activeOffer}
-                  onAfterAction={async () => {
-                    await fetchData()
-                    onMutate?.()
-                  }}
-                />
-              )}
+                  {/* === UNDERHÅLL === */}
+                  {isMaintenance && (
+                    <div className="bg-stone-100 border border-stone-300 rounded-lg p-4 space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium text-stone-700">
+                        <Wrench className="w-4 h-4 text-amber-500" />
+                        Underhåll / renovering
+                      </div>
+                      {week.legacyName && (
+                        <div className="text-sm text-stone-600">{week.legacyName}</div>
+                      )}
+                      <p className="text-xs text-stone-500">
+                        Veckan är blockerad för arbete och kan inte bokas.
+                      </p>
+                    </div>
+                  )}
 
-              {/* === HISTORIK (admin only) === */}
-              {isAdmin && (
-                <HistorySection
-                  open={historyOpen}
-                  setOpen={setHistoryOpen}
-                  weekNumber={week.week_number}
-                  history={history}
-                />
+                  {/* === BOKAD === */}
+                  {isBooked && (
+                    <BookedSection
+                      isOwnBooking={isOwnBooking}
+                      isOthersBooking={isOthersBooking}
+                      isLegacy={isLegacy}
+                      canSeeBookerName={canSeeBookerName}
+                      bookerName={bookerName}
+                      booking={booking}
+                      reserveCount={reserves.length}
+                      ownReserve={ownReserve}
+                      ownReserveRank={ownLotteryApp?.reserve_rank}
+                      activeOffer={activeOffer}
+                      actionLoading={actionLoading}
+                      editingNote={editingNote}
+                      noteDraft={noteDraft}
+                      setEditingNote={setEditingNote}
+                      setNoteDraft={setNoteDraft}
+                      onSaveNote={saveNote}
+                      onCancelBooking={() => setView('confirm-cancel')}
+                      onJoinReserve={handleJoinReserve}
+                      onLeaveReserve={() => setView('confirm-leave-reserve')}
+                      copiedField={copiedField}
+                      onCopy={copyToClipboard}
+                      paymentRef={booking ? paymentReference(booking.user, year, week.week_number) : ''}
+                    />
+                  )}
+
+                  {/* === ADMIN-SEKTION === */}
+                  {isAdmin && (
+                    <AdminSection
+                      open={adminOpen}
+                      setOpen={setAdminOpen}
+                      reserves={reserves}
+                      booking={booking}
+                      week={week}
+                      year={year}
+                      activeOffer={activeOffer}
+                      onAfterAction={async () => {
+                        await fetchData()
+                        onMutate?.()
+                      }}
+                    />
+                  )}
+
+                  {/* === HISTORIK (admin only) === */}
+                  {isAdmin && (
+                    <HistorySection
+                      open={historyOpen}
+                      setOpen={setHistoryOpen}
+                      weekNumber={week.week_number}
+                      history={history}
+                    />
+                  )}
+                </>
               )}
             </>
           )}
@@ -444,6 +456,7 @@ function PeriodInfo({ year, weekNumber }) {
   )
 }
 
+// eslint-disable-next-line no-unused-vars
 function InfoRow({ icon: Icon, label, value, iconClass = 'text-slate-400' }) {
   return (
     <div className="flex items-center gap-3 text-sm">
@@ -739,8 +752,9 @@ function BookedSection({
               {actionLoading ? <Spinner color="amber" /> : <><Star className="w-4 h-4" /> Ställ mig som reserv</>}
             </button>
           ) : (
-            <div className="text-[11px] text-slate-400 italic">
-              Veckan är registrerad som äldre bokning utan koppling till medlemskonto.
+            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg p-2.5 text-[11px] text-blue-700 leading-normal">
+              <Info className="w-3.5 h-3.5 shrink-0 text-blue-500 mt-0.5" />
+              <span>Veckan är registrerad som äldre bokning utan koppling till medlemskonto.</span>
             </div>
           )}
         </>
@@ -1302,6 +1316,7 @@ function HistorySection({ open, setOpen, weekNumber, history }) {
   // Visa endast slutförda veckor — checkOut < idag. useMemo undviker att
   // Date.now() anropas i render (bryter React 19s purity-regel).
   const sorted = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now()
     return [...history]
       .filter((row) => getWeekDateRange(row.year, weekNumber).checkOut.getTime() < now)

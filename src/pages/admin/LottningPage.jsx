@@ -47,7 +47,7 @@ function SortableApplicant({ app, index, isWinner }) {
 }
 
 export default function LottningPage() {
-  const { year, lotteryApps, weeks, fetchData } = useAdmin()
+  const { year, weeks, fetchData } = useAdmin()
   const [draftResults, setDraftResults] = useState(null)
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)

@@ -1,9 +1,7 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAdmin } from '../../context/AdminContext'
 import { CalendarDays, Plus, Trash2, Wrench, Star, X } from 'lucide-react'
-import { formatDateShort } from '../../lib/weeks'
-import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 export default function HistorikPage() {
@@ -14,14 +12,14 @@ export default function HistorikPage() {
   const [legacyForm, setLegacyForm] = useState(null)
   const [savingLegacy, setSavingLegacy] = useState(false)
 
-  useEffect(() => {
-    fetchLegacyBookings()
-  }, [year])
-
-  async function fetchLegacyBookings() {
+  const fetchLegacyBookings = useCallback(async () => {
     const { data } = await supabase.from('legacy_bookings').select('*').eq('year', year).order('week_number')
     setLegacyBookings(data || [])
-  }
+  }, [year])
+
+  useEffect(() => {
+    fetchLegacyBookings() // eslint-disable-line react-hooks/set-state-in-effect
+  }, [fetchLegacyBookings])
 
   async function saveLegacyBooking() {
     if (!legacyForm?.booked_by_name || !legacyForm?.week_number) return

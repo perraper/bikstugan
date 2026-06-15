@@ -9,6 +9,7 @@ import { cancelBooking } from '../lib/booking-actions'
 
 const AdminContext = createContext(null)
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAdmin() {
   return useContext(AdminContext)
 }
@@ -31,20 +32,6 @@ export function AdminProvider({ children }) {
   const [openIssuesCount, setOpenIssuesCount] = useState(0)
 
   const totalWeeks = getWeeksForYear(year)
-
-  useEffect(() => {
-    fetchData()
-    fetchPendingUsers()
-  }, [year])
-
-  useEffect(() => {
-    fetchOpenIssuesCount()
-    const channel = supabase
-      .channel('admin-issues-count')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' }, fetchOpenIssuesCount)
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [])
 
   async function fetchOpenIssuesCount() {
     const { count } = await supabase
@@ -111,6 +98,24 @@ export function AdminProvider({ children }) {
       })
     )
   }
+
+  useEffect(() => {
+    fetchData()
+    fetchPendingUsers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year])
+
+  useEffect(() => {
+    fetchOpenIssuesCount()
+    const channel = supabase
+      .channel('admin-issues-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' }, fetchOpenIssuesCount)
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+     
+  }, [])
+
+  // fetch methods moved above
 
   function finalRemaining(b) {
     return Math.max(0, (b.price || 0) - (b.deposit_amount || PAYMENT.depositAmount))

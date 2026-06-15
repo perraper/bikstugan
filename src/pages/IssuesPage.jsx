@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { Bug, Plus, Send, Check, Clock, Hammer, AlertTriangle } from 'lucide-react'
@@ -18,7 +18,7 @@ export default function IssuesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({ title: '', description: '' })
 
-  async function fetchIssues() {
+  const fetchIssues = useCallback(async () => {
     setLoading(true)
     const { data } = await supabase
       .from('issues')
@@ -26,11 +26,12 @@ export default function IssuesPage() {
       .order('created_at', { ascending: false })
     setIssues(data || [])
     setLoading(false)
-  }
+  }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchIssues()
-  }, [])
+  }, [fetchIssues])
 
   async function handleSubmit(e) {
     e.preventDefault()

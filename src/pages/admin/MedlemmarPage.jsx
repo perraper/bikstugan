@@ -13,7 +13,6 @@ export default function MedlemmarPage() {
     pendingUsers, allUsers, approvingId,
     approveUser, rejectUser, toggleAdmin, deleteMember,
     showMemberBookings, exportMembersCSV, formatLastSignIn,
-    fetchPendingUsers,
   } = useAdmin()
 
   const [memberSearch, setMemberSearch] = useState('')

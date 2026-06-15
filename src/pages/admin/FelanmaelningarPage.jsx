@@ -1,26 +1,23 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { useAdmin } from '../../context/AdminContext'
 import { Check, Hammer, X } from 'lucide-react'
 
 export default function FelanmaelningarPage() {
-  const { fetchOpenIssuesCount } = useAdmin()
   const [issues, setIssues] = useState([])
   const [issueFilter, setIssueFilter] = useState('open')
   const [issueResponse, setIssueResponse] = useState({ id: null, text: '' })
-  const { profile } = { profile: null } // not needed here directly
 
-  useEffect(() => {
-    fetchIssues()
-  }, [])
-
-  async function fetchIssues() {
+  const fetchIssues = useCallback(async () => {
     const { data } = await supabase
       .from('issues')
       .select('*, user:users!user_id(name, email), resolver:users!resolved_by(name)')
       .order('created_at', { ascending: false })
     setIssues(data || [])
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchIssues() // eslint-disable-line react-hooks/set-state-in-effect
+  }, [fetchIssues])
 
   async function updateIssueStatus(id, status, responseText) {
     const update = { status }

@@ -110,6 +110,7 @@ export default function CalendarPage() {
     fetchLegacy()
     fetchLotteryApps()
     fetchOwnBookings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year, profile])
 
   // Realtime: lyssna på ändringar i alla relevanta tabeller för året
@@ -141,17 +142,22 @@ export default function CalendarPage() {
       if (timer) clearTimeout(timer)
       supabase.removeChannel(channel)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year])
 
   useEffect(() => {
     if (!loading) {
-      if (selectedWeekNum && selectedWeekRef.current) {
-        selectedWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      } else if (year === today.year && currentWeekRef.current) {
-        currentWeekRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
+      // Use setTimeout to ensure the DOM nodes are fully rendered before scrolling
+      setTimeout(() => {
+        if (selectedWeekNum && selectedWeekRef.current) {
+          selectedWeekRef.current.scrollIntoView({ block: 'center' })
+        } else if (year === today.year && currentWeekRef.current) {
+          currentWeekRef.current.scrollIntoView({ block: 'center' })
+        }
+      }, 50)
     }
-  }, [loading, year, selectedWeekNum])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   function getWeekData(weekNum) {
     const dbWeek = weeks.find((w) => w.week_number === weekNum)
@@ -232,13 +238,14 @@ export default function CalendarPage() {
     }, { replace: true })
   }
 
-  const statusCounts = useMemo(() => {
+  const statusCounts = useMemo(() => {  
     const counts = { available: 0, booked: 0, lottery: 0, maintenance: 0 }
     for (let n = 1; n <= totalWeeks; n++) {
       const w = getWeekData(n)
       if (counts[w.status] !== undefined) counts[w.status]++
     }
     return counts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weeks, legacyMap, totalWeeks, year])
 
   // Härled selectedWeek reaktivt från selectedWeekNum + senaste data,
@@ -411,7 +418,7 @@ export default function CalendarPage() {
         </>
       )}
 
-      {selectedWeek && (
+      {selectedWeek && !loading && (
         <WeekPanel
           week={selectedWeek}
           year={year}

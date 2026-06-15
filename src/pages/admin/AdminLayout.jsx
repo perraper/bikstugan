@@ -54,32 +54,36 @@ function AdminSubnav() {
       </div>
 
       {/* Subnav links */}
-      <nav className="px-4 flex gap-0.5 overflow-x-auto py-1.5" style={{ scrollbarWidth: 'none' }}>
-        {SUBNAV.map(({ to, label, icon: Icon, badgeKey }) => {
-          const badge = badgeKey ? (badges[badgeKey] ?? 0) : 0
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
-                  isActive
-                    ? 'bg-red-50 text-red-700'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-                }`
-              }
-            >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              {label}
-              {badge > 0 && (
-                <span className="min-w-[16px] h-4 bg-red-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
-                  {badge > 99 ? '99+' : badge}
-                </span>
-              )}
-            </NavLink>
-          )
-        })}
-      </nav>
+      <div className="relative">
+        <nav className="px-4 flex gap-0.5 overflow-x-auto py-1.5" style={{ scrollbarWidth: 'none' }}>
+          {SUBNAV.map(({ to, label, icon: Icon, badgeKey }) => { // eslint-disable-line no-unused-vars
+            const badge = badgeKey ? (badges[badgeKey] ?? 0) : 0
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) =>
+                  `relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                    isActive
+                      ? 'bg-red-50 text-red-700'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                  }`
+                }
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                {label}
+                {badge > 0 && (
+                  <span className="min-w-[16px] h-4 bg-red-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-1">
+                    {badge > 99 ? '99+' : badge}
+                  </span>
+                )}
+              </NavLink>
+            )
+          })}
+        </nav>
+        {/* Right fade gradient to indicate scrolling */}
+        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none sm:hidden" />
+      </div>
     </div>
   )
 }
@@ -137,7 +141,7 @@ function MemberModal() {
               { label: 'Namn', key: 'name', type: 'text', icon: User, note: null },
               { label: 'E-post', key: 'email', type: 'email', icon: Mail, note: 'Ändras både i auth (inloggning) och medlemsregistret. Ingen bekräftelse skickas.' },
               { label: 'Telefon', key: 'phone', type: 'tel', icon: Phone, note: null },
-            ].map(({ label, key, type, icon: Icon, note }) => (
+            ].map(({ label, key, type, icon: Icon, note }) => ( // eslint-disable-line no-unused-vars
               <div key={key}>
                 <label className="block text-[11px] text-slate-400 mb-1">{label}</label>
                 <div className="relative">

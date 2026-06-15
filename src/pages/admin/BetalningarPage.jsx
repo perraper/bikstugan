@@ -210,9 +210,7 @@ export default function BetalningarPage() {
               <div
                 key={b.id}
                 onClick={(e) => {
-                  if (e.target.closest('.member-link')) {
-                    showMemberBookings(b.user)
-                  } else if (!e.target.closest('button') && !e.target.closest('input')) {
+                  if (!e.target.closest('button') && !e.target.closest('input')) {
                     navigate(`/?year=${b.year}&week=${b.week_number}&from=${encodeURIComponent(location.pathname + location.search)}`)
                   }
                 }}
@@ -227,10 +225,8 @@ export default function BetalningarPage() {
                 <div className="flex items-center gap-3">
                   <div className="text-xs font-bold text-slate-600 w-7 shrink-0">V{b.week_number}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-700 truncate">
-                      <span className="member-link hover:underline cursor-pointer text-slate-800 font-semibold" title="Visa medlemshistorik">
-                        {b.user?.name || 'Okänd'}
-                      </span>
+                    <div className="text-sm font-medium text-slate-800 truncate">
+                      {b.user?.name || 'Okänd'}
                     </div>
                     <div className="text-[11px] text-slate-400 truncate">
                       {formatDateShort(dates.checkIn)} – {formatDateShort(dates.checkOut)} · {b.price} kr
@@ -284,7 +280,7 @@ export default function BetalningarPage() {
                       </button>
                       <button
                         onClick={() => cancelBookingAdmin(b)}
-                        className="flex items-center justify-center gap-1.5 text-[11px] bg-red-100 hover:bg-red-200 text-red-700 px-2.5 py-1 rounded-lg font-medium transition-colors w-full sm:w-auto min-w-[85px]"
+                        className="flex items-center justify-center gap-1.5 text-[11px] border border-transparent text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1 rounded-lg font-medium transition-colors w-full sm:w-auto min-w-[85px]"
                       >
                         <Trash2 className="w-3 h-3" /> Ta bort
                       </button>

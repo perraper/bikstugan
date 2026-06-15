@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Zap, Calculator, ArrowRight, CheckCircle2, Save } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
@@ -84,7 +85,8 @@ export default function ElectricityPage() {
 
   useEffect(() => {
     if (!profile) return
-    fetchData()
+    fetchData()  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile])
 
   const selectedBooking = useMemo(
@@ -153,8 +155,22 @@ export default function ElectricityPage() {
       </div>
 
       {bookings.length === 0 ? (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">
-          Du har inga bokningar att läsa av el för.
+        <div className="bg-slate-50 border border-slate-200 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+            <Zap className="w-6 h-6 text-slate-400" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold text-slate-700">Inga elavläsningar</h3>
+            <p className="text-xs text-slate-400 max-w-xs">
+              Du har inga bokade veckor under det senaste eller nuvarande året att läsa av el för.
+            </p>
+          </div>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-colors mt-2"
+          >
+            Gå till kalendern och boka din vecka →
+          </Link>
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">

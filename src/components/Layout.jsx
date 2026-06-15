@@ -62,6 +62,7 @@ export default function Layout() {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1">
+            {/* eslint-disable-next-line no-unused-vars */}
             {links.map(({ to, label, icon: Icon, badge }) => (
               <Link
                 key={to}
@@ -105,6 +106,7 @@ export default function Layout() {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <nav className="md:hidden border-t border-slate-200 bg-white px-4 pb-4">
+            {/* eslint-disable-next-line no-unused-vars */}
             {links.map(({ to, label, icon: Icon, badge }) => (
               <Link
                 key={to}

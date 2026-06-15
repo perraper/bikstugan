@@ -19,7 +19,7 @@ function StatCard({ label, value, sub, icon }) {
 }
 
 export default function StatistikPage() {
-  const { year, allBookings, lotteryApps, allUsers, weeks, totalWeeks } = useAdmin()
+  const { year, allBookings, lotteryApps, allUsers, totalWeeks } = useAdmin()
   const [exportingBackup, setExportingBackup] = useState(false)
 
   const yearStats = useMemo(() => {
@@ -27,10 +27,26 @@ export default function StatistikPage() {
     const bookedCount = confirmedBookings.length
     const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (b.price || 0), 0)
     const occupancy = totalWeeks > 0 ? Math.round((bookedCount / totalWeeks) * 100) : 0
-    const bySeason = { 'Högsäsong': 0, 'Normalsäsong': 0, 'Lågsäsong': 0 }
+    let highSeasonTotal = 0
+    let lowSeasonTotal = 0
+    let normalSeasonTotal = 0
+    for (let w = 1; w <= totalWeeks; w++) {
+      const label = getSeasonPrice(w).label
+      if (label === 'Högsäsong') highSeasonTotal++
+      else if (label === 'Lågsäsong') lowSeasonTotal++
+      else normalSeasonTotal++
+    }
+
+    const bySeason = {
+      'Högsäsong': { booked: 0, total: highSeasonTotal },
+      'Normalsäsong': { booked: 0, total: normalSeasonTotal },
+      'Lågsäsong': { booked: 0, total: lowSeasonTotal }
+    }
     for (const b of confirmedBookings) {
       const label = getSeasonPrice(b.week_number).label
-      bySeason[label] = (bySeason[label] || 0) + 1
+      if (bySeason[label]) {
+        bySeason[label].booked++
+      }
     }
     const lotteryDemand = {}
     for (const a of lotteryApps) {
@@ -68,17 +84,24 @@ export default function StatistikPage() {
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
         <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Bokningar per säsong</h3>
         <div className="space-y-2">
-          {Object.entries(yearStats.bySeason).map(([label, count]) => {
-            const max = Math.max(1, ...Object.values(yearStats.bySeason))
-            const pct = (count / max) * 100
+          {Object.entries(yearStats.bySeason).map(([label, { booked, total }]) => {
+            const pct = total > 0 ? Math.round((booked / total) * 100) : 0
+            const seasonColors = {
+              'Högsäsong': 'bg-rose-500',
+              'Normalsäsong': 'bg-amber-500',
+              'Lågsäsong': 'bg-blue-500'
+            }
+            const colorClass = seasonColors[label] || 'bg-slate-500'
             return (
               <div key={label}>
                 <div className="flex justify-between text-xs text-slate-500 mb-0.5">
                   <span>{label}</span>
-                  <span className="font-medium text-slate-700">{count}</span>
+                  <span className="font-medium text-slate-700">
+                    {booked} av {total} veckor <span className="text-slate-400 font-normal">({pct}%)</span>
+                  </span>
                 </div>
                 <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-red-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  <div className={`h-full ${colorClass} rounded-full transition-all`} style={{ width: `${pct}%` }} />
                 </div>
               </div>
             )
