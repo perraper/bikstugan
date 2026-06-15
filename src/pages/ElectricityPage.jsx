@@ -20,6 +20,7 @@ export default function ElectricityPage() {
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
   const [error, setError] = useState(null)
+  const [prevEndHint, setPrevEndHint] = useState(null)
 
   function pickPreferredBooking(bks, readingMap) {
     const today = new Date()
@@ -42,13 +43,35 @@ export default function ElectricityPage() {
     return withDates[0]?.b
   }
 
-  function selectBooking(bookingId, readingMap = readings) {
+  async function selectBooking(bookingId, readingMap = readings, bksList = bookings) {
     setSelectedBookingId(bookingId)
     setError(null)
     setSavedAt(null)
     const r = readingMap[bookingId]
-    setStartKwh(r?.start_kwh != null ? String(r.start_kwh) : '')
-    setEndKwh(r?.end_kwh != null ? String(r.end_kwh) : '')
+    if (r?.start_kwh != null) {
+      setStartKwh(String(r.start_kwh))
+      setEndKwh(r?.end_kwh != null ? String(r.end_kwh) : '')
+      setPrevEndHint(null)
+    } else {
+      const booking = bksList.find((b) => b.id === bookingId)
+      let prevEnd = null
+      if (booking) {
+        const { data } = await supabase
+          .from('electricity_readings')
+          .select('end_kwh, booking:bookings!booking_id(year, week_number)')
+          .eq('user_id', profile.id)
+          .not('end_kwh', 'is', null)
+        const thisKey = booking.year * 100 + booking.week_number
+        let bestKey = -Infinity
+        for (const rd of data || []) {
+          const k = ((rd.booking?.year || 0) * 100) + (rd.booking?.week_number || 0)
+          if (k < thisKey && k > bestKey) { bestKey = k; prevEnd = rd.end_kwh }
+        }
+      }
+      setStartKwh(prevEnd != null ? String(prevEnd) : '')
+      setEndKwh('')
+      setPrevEndHint(prevEnd)
+    }
   }
 
   async function fetchData() {
@@ -77,7 +100,7 @@ export default function ElectricityPage() {
       setReadings(map)
 
       const preferred = pickPreferredBooking(bks, map)
-      if (preferred) selectBooking(preferred.id, map)
+      if (preferred) selectBooking(preferred.id, map, bks)
     }
 
     setLoading(false)
@@ -217,6 +240,11 @@ export default function ElectricityPage() {
                 placeholder="t.ex. 12345"
                 className="w-full bg-white border border-slate-300 rounded-lg px-4 py-3 text-lg text-slate-800 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 transition-all"
               />
+              {prevEndHint != null && (
+                <p className="text-xs text-amber-600 mt-1.5 flex items-center gap-1">
+                  <Zap className="w-3 h-3" /> Föregående slutavläsning: {Number(prevEndHint).toLocaleString('sv-SE')} kWh
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm text-slate-500 mb-1">Slut-kWh (vid avfärd)</label>

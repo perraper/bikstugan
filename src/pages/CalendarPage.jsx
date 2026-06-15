@@ -399,7 +399,7 @@ export default function CalendarPage() {
 
       {loading ? (
         <div className="grid grid-cols-6 sm:grid-cols-9 lg:grid-cols-13 gap-1">
-          {Array.from({ length: 26 }).map((_, i) => (
+          {Array.from({ length: totalWeeks }).map((_, i) => (
             <div key={i} className="h-14 bg-slate-100 rounded-lg animate-pulse" />
           ))}
         </div>
