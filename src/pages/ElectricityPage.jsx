@@ -276,7 +276,6 @@ export default function ElectricityPage() {
                 <div>
                   Betala till plusgiro <strong className="text-slate-700">{PAYMENT.plusgiro}</strong> ({PAYMENT.payee})
                 </div>
-                <div className="text-slate-400">Tyvärr ingen Swish än.</div>
               </div>
             </div>
           )}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle2, CreditCard, Copy, Check, QrCode, Smartphone } from 'lucide-react'
-import { PAYMENT, getSwishUrl, getSwishQrUrl } from '../lib/config'
+import { PAYMENT, isSwishEnabled, getSwishUrl, getSwishQrUrl } from '../lib/config'
 
 function PaymentRow({ label, value, field, copiedField, onCopy }) {
   return (
@@ -87,39 +87,41 @@ export default function BookingPaymentInfo({ booking, paymentRef, compact = fals
             </div>
           )}
           {/* Swish-knapp och QR-kod */}
-          <div className="pt-1 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <a
-                href={getSwishUrl({ amount: depositAmount, message: paymentRef })}
-                className="inline-flex items-center gap-1.5 bg-[#002f6c] hover:bg-[#00224f] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>Öppna i Swish ({depositAmount.toLocaleString('sv-SE')} kr)</span>
-              </a>
-              <button
-                type="button"
-                onClick={() => setShowSwishQr(showSwishQr === 'deposit' ? null : 'deposit')}
-                className="inline-flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-                title="Visa Swish QR-kod"
-              >
-                <QrCode className="w-3.5 h-3.5 text-slate-500" />
-                <span>{showSwishQr === 'deposit' ? 'Dölj QR' : 'Swish QR-kod'}</span>
-              </button>
-            </div>
-
-            {showSwishQr === 'deposit' && (
-              <div className="bg-white rounded-lg p-3 border border-amber-200 flex flex-col items-center text-center space-y-2">
-                <img
-                  src={getSwishQrUrl({ amount: depositAmount, message: paymentRef })}
-                  alt="Swish QR-kod"
-                  className="w-36 h-36 rounded-md border border-slate-100"
-                />
-                <div className="text-xs text-slate-600">
-                  Scanna med Swish-appen för att betala <strong>{depositAmount} kr</strong>.
-                </div>
+          {isSwishEnabled && (
+            <div className="pt-1 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={getSwishUrl({ amount: depositAmount, message: paymentRef })}
+                  className="inline-flex items-center gap-1.5 bg-[#002f6c] hover:bg-[#00224f] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Öppna i Swish ({depositAmount.toLocaleString('sv-SE')} kr)</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowSwishQr(showSwishQr === 'deposit' ? null : 'deposit')}
+                  className="inline-flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  title="Visa Swish QR-kod"
+                >
+                  <QrCode className="w-3.5 h-3.5 text-slate-500" />
+                  <span>{showSwishQr === 'deposit' ? 'Dölj QR' : 'Swish QR-kod'}</span>
+                </button>
               </div>
-            )}
-          </div>
+
+              {showSwishQr === 'deposit' && (
+                <div className="bg-white rounded-lg p-3 border border-amber-200 flex flex-col items-center text-center space-y-2">
+                  <img
+                    src={getSwishQrUrl({ amount: depositAmount, message: paymentRef })}
+                    alt="Swish QR-kod"
+                    className="w-36 h-36 rounded-md border border-slate-100"
+                  />
+                  <div className="text-xs text-slate-600">
+                    Scanna med Swish-appen för att betala <strong>{depositAmount} kr</strong>.
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -128,16 +130,16 @@ export default function BookingPaymentInfo({ booking, paymentRef, compact = fals
         booking.final_paid ? (
           <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-xs text-emerald-700">
             <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-            <span>Slutbetalning {remaining.toLocaleString('sv-SE')} kr betald</span>
+            <span>Slutbetalning {remaining.toLocaleString('sv-SE')} kr klar</span>
           </div>
         ) : (
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2">
             <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 font-medium">
               <CreditCard className="w-4 h-4 shrink-0" />
-              <span>Slutbetalning {remaining.toLocaleString('sv-SE')} kr — ej betald</span>
+              <span>Slutbetalning {remaining.toLocaleString('sv-SE')} kr — ej klar</span>
             </div>
             {compact ? (
-              <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-2">
+              <div className="text-[11px] text-slate-600 flex flex-wrap gap-x-2">
                 <span>Plusgiro: <strong>{PAYMENT.plusgiro}</strong> ({PAYMENT.payee})</span>
                 <span>·</span>
                 <span>Meddelande: <strong>{paymentRef}</strong></span>
@@ -169,39 +171,41 @@ export default function BookingPaymentInfo({ booking, paymentRef, compact = fals
             )}
 
             {/* Swish-knapp och QR-kod för slutbetalning */}
-            <div className="pt-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href={getSwishUrl({ amount: remaining, message: paymentRef })}
-                  className="inline-flex items-center gap-1.5 bg-[#002f6c] hover:bg-[#00224f] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  <span>Öppna i Swish ({remaining.toLocaleString('sv-SE')} kr)</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setShowSwishQr(showSwishQr === 'final' ? null : 'final')}
-                  className="inline-flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-                  title="Visa Swish QR-kod"
-                >
-                  <QrCode className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{showSwishQr === 'final' ? 'Dölj QR' : 'Swish QR-kod'}</span>
-                </button>
-              </div>
-
-              {showSwishQr === 'final' && (
-                <div className="bg-white rounded-lg p-3 border border-slate-200 flex flex-col items-center text-center space-y-2">
-                  <img
-                    src={getSwishQrUrl({ amount: remaining, message: paymentRef })}
-                    alt="Swish QR-kod"
-                    className="w-36 h-36 rounded-md border border-slate-100"
-                  />
-                  <div className="text-xs text-slate-600">
-                    Scanna med Swish-appen för att betala <strong>{remaining.toLocaleString('sv-SE')} kr</strong>.
-                  </div>
+            {isSwishEnabled && (
+              <div className="pt-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={getSwishUrl({ amount: remaining, message: paymentRef })}
+                    className="inline-flex items-center gap-1.5 bg-[#002f6c] hover:bg-[#00224f] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors cursor-pointer"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    <span>Öppna i Swish ({remaining.toLocaleString('sv-SE')} kr)</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setShowSwishQr(showSwishQr === 'final' ? null : 'final')}
+                    className="inline-flex items-center gap-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                    title="Visa Swish QR-kod"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{showSwishQr === 'final' ? 'Dölj QR' : 'Swish QR-kod'}</span>
+                  </button>
                 </div>
-              )}
-            </div>
+
+                {showSwishQr === 'final' && (
+                  <div className="bg-white rounded-lg p-3 border border-slate-200 flex flex-col items-center text-center space-y-2">
+                    <img
+                      src={getSwishQrUrl({ amount: remaining, message: paymentRef })}
+                      alt="Swish QR-kod"
+                      className="w-36 h-36 rounded-md border border-slate-100"
+                    />
+                    <div className="text-xs text-slate-600">
+                      Scanna med Swish-appen för att betala <strong>{remaining.toLocaleString('sv-SE')} kr</strong>.
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )
       )}
