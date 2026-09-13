@@ -87,16 +87,31 @@ export default function LottningPage() {
 
   async function generateDraft() {
     setGenerating(true)
+    const weekNumbers = lotteryWeeks.map((w) => w.week_number)
+    const { data: apps, error } = await supabase
+      .from('lottery_applications')
+      .select('*, user:users(name, email)')
+      .eq('year', year)
+      .eq('status', 'pending')
+      .in('week_number', weekNumbers)
+
+    if (error) {
+      console.error('Kunde inte hämta lottningsansökningar:', error)
+      setGenerating(false)
+      return
+    }
+
+    const grouped = {}
+    for (const app of apps || []) {
+      if (!grouped[app.week_number]) grouped[app.week_number] = []
+      grouped[app.week_number].push(app)
+    }
+
     const results = {}
     for (const w of lotteryWeeks) {
-      const { data: apps } = await supabase
-        .from('lottery_applications')
-        .select('*, user:users(name, email)')
-        .eq('year', year)
-        .eq('week_number', w.week_number)
-        .eq('status', 'pending')
-      if (apps && apps.length > 0) {
-        const shuffled = [...apps]
+      const weekApps = grouped[w.week_number]
+      if (weekApps && weekApps.length > 0) {
+        const shuffled = [...weekApps]
         for (let i = shuffled.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
@@ -124,39 +139,48 @@ export default function LottningPage() {
   async function publishResults() {
     if (!draftResults) return
     setPublishing(true)
-    const auditSummary = {}
-    for (const [weekNum, apps] of Object.entries(draftResults)) {
-      const wn = Number(weekNum)
-      if (apps.length === 0) continue
-      const winner = apps[0]
-      auditSummary[wn] = { winner_id: winner.user_id, reserves: apps.slice(1).map((a, i) => ({ rank: i + 1, user_id: a.user_id })) }
-      await supabase.from('lottery_applications').update({ status: 'won' }).eq('id', winner.id)
-      for (let i = 1; i < apps.length; i++) {
-        await supabase.from('lottery_applications').update({ status: 'reserve', reserve_rank: i }).eq('id', apps[i].id)
+    try {
+      const prices = {}
+      for (const [weekNum] of Object.entries(draftResults)) {
+        prices[weekNum] = getSeasonPrice(Number(weekNum)).price
       }
-      await supabase.from('weeks').upsert(
-        { year, week_number: wn, status: 'booked', booked_by_user_id: winner.user_id, price: getSeasonPrice(wn).price },
-        { onConflict: 'year,week_number' }
-      )
-      await supabase.from('bookings').insert({
-        user_id: winner.user_id, year, week_number: wn, price: getSeasonPrice(wn).price, status: 'confirmed',
+      for (const w of lotteryWeeks) {
+        prices[w.week_number] = getSeasonPrice(w.week_number).price
+      }
+
+      // 1. Atomär publicering via PostgreSQL RPC
+      const { error: rpcError } = await supabase.rpc('publish_lottery_results', {
+        p_year: year,
+        p_draft: draftResults,
+        p_prices: prices,
       })
-      supabase.functions.invoke('send-email', { body: { type: 'lottery_result', userId: winner.user_id, weekNumber: wn, year, extra: { won: true } } }).catch(console.error)
-      for (let i = 1; i < apps.length; i++) {
-        supabase.functions.invoke('send-email', { body: { type: 'lottery_result', userId: apps[i].user_id, weekNumber: wn, year, extra: { won: false, reserveRank: i } } }).catch(console.error)
+
+      if (rpcError) throw rpcError
+
+      // 2. Skicka mejl asynkront i bakgrunden utan att blockera databastransaktionen
+      for (const [weekNum, apps] of Object.entries(draftResults)) {
+        const wn = Number(weekNum)
+        if (apps.length === 0) continue
+        const winner = apps[0]
+        supabase.functions.invoke('send-email', {
+          body: { type: 'lottery_result', userId: winner.user_id, weekNumber: wn, year, extra: { won: true } },
+        }).catch(console.error)
+
+        for (let i = 1; i < apps.length; i++) {
+          supabase.functions.invoke('send-email', {
+            body: { type: 'lottery_result', userId: apps[i].user_id, weekNumber: wn, year, extra: { won: false, reserveRank: i } },
+          }).catch(console.error)
+        }
       }
+
+      setDraftResults(null)
+      fetchData()
+    } catch (err) {
+      console.error('Kunde inte publicera lottningsresultat:', err)
+      alert(err.message || 'Ett fel uppstod vid publicering av lottningen.')
+    } finally {
+      setPublishing(false)
     }
-    for (const w of lotteryWeeks) {
-      if (!draftResults[w.week_number] || draftResults[w.week_number].length === 0) {
-        await supabase.from('weeks').upsert(
-          { year, week_number: w.week_number, status: 'available', price: getSeasonPrice(w.week_number).price },
-          { onConflict: 'year,week_number' }
-        )
-      }
-    }
-    setDraftResults(null)
-    setPublishing(false)
-    fetchData()
   }
 
   return (

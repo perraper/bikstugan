@@ -69,10 +69,68 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const payload: EmailPayload = await req.json()
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
+        status: 401,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
 
-    // Fetch user
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+    const isServiceRole = token === SUPABASE_SERVICE_KEY
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    let callingUserId: string | null = null
+    let isCallingAdmin = false
+
+    if (!isServiceRole) {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token)
+      if (authError || !authUser) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired token' }), {
+          status: 401,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        })
+      }
+      callingUserId = authUser.id
+
+      const { data: callerProfile } = await supabase
+        .from('users')
+        .select('role, approved')
+        .eq('id', callingUserId)
+        .single()
+
+      isCallingAdmin = callerProfile?.role === 'admin'
+    }
+
+    const payload: EmailPayload = await req.json()
+
+    // Validera behörigheter för icke-admin / icke-service_role
+    if (!isServiceRole && !isCallingAdmin) {
+      const allowedMemberTypes: EmailPayload['type'][] = [
+        'booking_confirmation',
+        'booking_cancelled',
+        'booking_admin_notify',
+        'new_account',
+        'issue_created',
+      ]
+
+      if (payload.userId !== callingUserId) {
+        return new Response(JSON.stringify({ error: 'Forbidden: Cannot trigger emails for another user' }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!allowedMemberTypes.includes(payload.type)) {
+        return new Response(JSON.stringify({ error: `Forbidden: Action '${payload.type}' requires admin privileges` }), {
+          status: 403,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    // Fetch target user for email recipient
     const { data: user } = await supabase
       .from('users')
       .select('*')
