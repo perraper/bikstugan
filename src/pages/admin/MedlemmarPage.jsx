@@ -128,7 +128,12 @@ export default function MedlemmarPage() {
                 <div key={row.email} className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md">
                   <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="text-xs text-slate-600 truncate flex-1">{row.email}</span>
-                  <button onClick={() => removeAllowedEmail(row.email)} className="p-1 text-slate-400 hover:text-red-500 transition-colors" title="Ta bort">
+                  <button
+                    onClick={() => removeAllowedEmail(row.email)}
+                    className="p-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                    title="Ta bort"
+                    aria-label={`Ta bort ${row.email}`}
+                  >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -156,14 +161,16 @@ export default function MedlemmarPage() {
               <button
                 onClick={() => rejectUser(u)}
                 disabled={approvingId === u.id}
-                className="w-8 h-8 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50"
+                aria-label={`Avvisa användare ${u.name}`}
+                className="w-8 h-8 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-100 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
               <button
                 onClick={() => approveUser(u.id)}
                 disabled={approvingId === u.id}
-                className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                aria-label={`Godkänn användare ${u.name}`}
+                className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <Check className="w-4 h-4" />
               </button>
@@ -230,7 +237,8 @@ export default function MedlemmarPage() {
                 onClick={() => deleteMember(u)}
                 disabled={approvingId === u.id}
                 title="Ta bort medlem (anonymisera)"
-                className="p-1.5 text-slate-400 hover:text-red-500 disabled:opacity-50 transition-colors shrink-0"
+                aria-label={`Ta bort medlem ${u.name}`}
+                className="p-1.5 text-slate-400 hover:text-red-500 disabled:opacity-50 transition-colors shrink-0 cursor-pointer"
               >
                 <Trash2 className="w-4 h-4" />
               </button>

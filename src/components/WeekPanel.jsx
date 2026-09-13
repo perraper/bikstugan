@@ -300,7 +300,12 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
               {isOwnBooking ? 'Din bokning' : badge.label}
             </span>
           </div>
-          <button onClick={() => onClose(false)} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
+          <button
+            onClick={() => onClose(false)}
+            className="p-1 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            title="Stäng veckopanel"
+            aria-label="Stäng veckopanel"
+          >
             <X className="w-5 h-5 text-slate-400" />
           </button>
         </div>

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Check, Hammer, X } from 'lucide-react'
+import { Check, Hammer, Image as ImageIcon, X } from 'lucide-react'
 
 export default function FelanmaelningarPage() {
   const [issues, setIssues] = useState([])
   const [issueFilter, setIssueFilter] = useState('open')
   const [issueResponse, setIssueResponse] = useState({ id: null, text: '' })
+  const [previewModal, setPreviewModal] = useState(null)
 
   const fetchIssues = useCallback(async () => {
     const { data } = await supabase
@@ -84,12 +85,32 @@ export default function FelanmaelningarPage() {
               </span>
             </div>
 
-            <p className="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 rounded-lg p-3">{issue.description}</p>
+            <p className="text-sm text-slate-700 whitespace-pre-wrap bg-slate-50 rounded-lg p-3">{issue.description}</p>
+
+            {issue.image_url && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewModal(issue.image_url)}
+                  aria-label="Förstora bild"
+                  className="group relative inline-block rounded-lg overflow-hidden border border-slate-200 cursor-pointer text-left"
+                >
+                  <img
+                    src={issue.image_url}
+                    alt={issue.title}
+                    className="h-28 w-auto max-w-xs object-cover rounded-lg group-hover:opacity-90 transition-opacity"
+                  />
+                  <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <ImageIcon className="w-3 h-3" /> Visa bild
+                  </span>
+                </button>
+              </div>
+            )}
 
             {issue.admin_response && (
               <div className="bg-blue-50 border-l-2 border-blue-300 rounded px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-blue-500 font-semibold mb-0.5">Adminsvar</div>
-                <p className="text-xs text-slate-600 whitespace-pre-wrap">{issue.admin_response}</p>
+                <div className="text-[10px] uppercase tracking-wide text-blue-600 font-semibold mb-0.5">Adminsvar</div>
+                <p className="text-xs text-slate-700 whitespace-pre-wrap">{issue.admin_response}</p>
               </div>
             )}
 
@@ -108,7 +129,7 @@ export default function FelanmaelningarPage() {
                 {issue.status === 'open' && (
                   <button
                     onClick={() => updateIssueStatus(issue.id, 'in_progress')}
-                    className="flex items-center gap-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg font-medium"
+                    className="flex items-center gap-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2.5 py-1.5 rounded-lg font-medium cursor-pointer"
                   >
                     <Hammer className="w-3 h-3" />
                     Påbörja
@@ -118,14 +139,14 @@ export default function FelanmaelningarPage() {
                   <>
                     <button
                       onClick={() => updateIssueStatus(issue.id, 'resolved', issueResponse.text)}
-                      className="flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-medium"
+                      className="flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg font-medium cursor-pointer"
                     >
                       <Check className="w-3 h-3" />
                       Markera löst
                     </button>
                     <button
                       onClick={() => setIssueResponse({ id: null, text: '' })}
-                      className="text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5"
+                      className="text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5 cursor-pointer"
                     >
                       Avbryt
                     </button>
@@ -133,7 +154,7 @@ export default function FelanmaelningarPage() {
                 ) : (
                   <button
                     onClick={() => setIssueResponse({ id: issue.id, text: issue.admin_response || '' })}
-                    className="flex items-center gap-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-lg font-medium"
+                    className="flex items-center gap-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2.5 py-1.5 rounded-lg font-medium cursor-pointer"
                   >
                     <Check className="w-3 h-3" />
                     Lös
@@ -143,6 +164,32 @@ export default function FelanmaelningarPage() {
             )}
           </div>
         ))
+      )}
+
+      {previewModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPreviewModal(null)}
+        >
+          <div
+            className="relative max-w-3xl max-h-[90vh] bg-white rounded-xl overflow-hidden p-2 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewModal(null)}
+              aria-label="Stäng bildvisning"
+              className="absolute top-4 right-4 z-10 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewModal}
+              alt="Bifogad bild"
+              className="max-h-[80vh] w-auto mx-auto rounded-lg object-contain"
+            />
+          </div>
+        </div>
       )}
     </div>
   )

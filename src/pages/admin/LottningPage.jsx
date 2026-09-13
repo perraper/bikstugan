@@ -26,7 +26,12 @@ function SortableApplicant({ app, index, isWinner }) {
         isWinner ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'
       }`}
     >
-      <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-600">
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label={`Dra för att ändra ordning för ${app.user?.name || 'ansökan'}`}
+        className="cursor-grab active:cursor-grabbing p-1 text-slate-400 hover:text-slate-600"
+      >
         <GripVertical className="w-4 h-4" />
       </button>
       <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold bg-slate-200 text-slate-600">

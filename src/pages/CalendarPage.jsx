@@ -22,6 +22,8 @@ const WeekCard = memo(forwardRef(function WeekCard(
     <button
       ref={ref}
       onClick={() => onClick(weekNum)}
+      aria-label={`Vecka ${weekNum}, ${formatDateShort(dates.checkIn)}, status ${cfg.label}${bookedName ? `, bokad av ${bookedName}` : ''}`}
+      aria-current={isCurrent ? 'date' : undefined}
       className={`${cfg.bg} ${cfg.border} border rounded-xl text-left transition-all relative p-2 sm:p-2.5 hover:shadow-md hover:scale-[1.03] cursor-pointer active:scale-[0.97] ${
         hidden ? 'opacity-20' : ''
       } ${isCurrent ? 'ring-2 ring-blue-500 ring-offset-1' : ''} ${
@@ -29,41 +31,41 @@ const WeekCard = memo(forwardRef(function WeekCard(
       }`}
     >
       {isCurrent && (
-        <span className="absolute -top-1.5 -right-1 bg-blue-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-sm">
+        <span className="absolute -top-1.5 -right-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-sm tracking-wide">
           IDAG
         </span>
       )}
       <div className="flex items-center justify-between mb-0.5">
-        <span className="font-bold text-slate-700 text-[11px] sm:text-xs">V{weekNum}</span>
-        <span className={`w-2 h-2 rounded-full ${cfg.dot} ${week.isLegacy ? 'opacity-60' : ''}`} />
+        <span className="font-bold text-slate-800 text-xs sm:text-sm">V{weekNum}</span>
+        <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot} ${week.isLegacy ? 'opacity-60' : ''}`} />
       </div>
-      <div className="text-[10px] text-slate-400 leading-tight">{formatDateShort(dates.checkIn)}</div>
+      <div className="text-xs text-slate-500 font-medium leading-tight">{formatDateShort(dates.checkIn)}</div>
 
       {week.status === 'maintenance' ? (
         <div className="flex items-center gap-1 mt-0.5 leading-tight" title={week.legacyName || 'Underhåll'}>
-          <Wrench className="w-3 h-3 text-amber-500 shrink-0" />
-          <span className="text-[10px] text-stone-600 font-medium truncate">
+          <Wrench className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+          <span className="text-xs text-stone-700 font-medium truncate">
             {week.legacyName || 'Underhåll'}
           </span>
         </div>
       ) : week.status === 'booked' && bookedName ? (
-        <div className="text-[10px] text-slate-500 truncate mt-0.5 leading-tight" title={bookedName}>
+        <div className="text-xs text-slate-700 font-medium truncate mt-0.5 leading-tight" title={bookedName}>
           {bookedName}
         </div>
       ) : (
-        <div className="font-semibold text-slate-600 mt-0.5 text-[10px] sm:text-xs">
+        <div className="font-semibold text-slate-800 mt-0.5 text-xs sm:text-sm">
           {season.price} kr
         </div>
       )}
 
       {applied && !week.isLegacy && (
         <div className="flex items-center gap-0.5 mt-0.5">
-          <Check className="w-3 h-3 text-purple-600" />
-          <span className="text-[9px] text-purple-600 font-medium">Anmäld</span>
+          <Check className="w-3.5 h-3.5 text-purple-700" />
+          <span className="text-[11px] text-purple-700 font-semibold">Anmäld</span>
         </div>
       )}
       {week.interestCount > 0 && (
-        <div className="text-[9px] text-purple-500 font-medium mt-0.5">
+        <div className="text-[11px] text-purple-700 font-medium mt-0.5">
           {week.interestCount} intressent{week.interestCount !== 1 ? 'er' : ''}
         </div>
       )}
@@ -314,11 +316,21 @@ export default function CalendarPage() {
         </div>
 
         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-          <button onClick={() => handleYearChange(year - 1)} className="p-1 hover:bg-slate-200 rounded transition-colors" title="Föregående år">
+          <button
+            onClick={() => handleYearChange(year - 1)}
+            className="p-1 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+            title="Föregående år"
+            aria-label="Föregående år"
+          >
             <ChevronLeft className="w-4 h-4 text-slate-500" />
           </button>
           <span className="text-sm font-semibold text-slate-700 w-12 text-center">{year}</span>
-          <button onClick={() => handleYearChange(year + 1)} className="p-1 hover:bg-slate-200 rounded transition-colors" title="Nästa år">
+          <button
+            onClick={() => handleYearChange(year + 1)}
+            className="p-1 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+            title="Nästa år"
+            aria-label="Nästa år"
+          >
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </button>
         </div>

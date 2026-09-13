@@ -330,8 +330,9 @@ export default function BetalningarPage() {
                       )}
                       <button 
                         onClick={() => { setEditingElecId(b.id); setElecStart(b.electricity.start_kwh ?? ''); setElecEnd(b.electricity.end_kwh ?? '') }}
-                        className="p-1 hover:bg-amber-200/50 rounded transition-colors"
+                        className="p-1 hover:bg-amber-200/50 rounded transition-colors cursor-pointer"
                         title="Redigera elavläsning"
+                        aria-label="Redigera elavläsning"
                       >
                         <Pencil className="w-3 h-3 opacity-60 hover:opacity-100" />
                       </button>

@@ -198,7 +198,11 @@ export default function HistorikPage() {
                   <button onClick={() => setLegacyForm({ ...b })} className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded transition-colors">
                     Redigera
                   </button>
-                  <button onClick={() => deleteLegacyBooking(b.id)} className="p-1 hover:bg-red-50 text-slate-300 hover:text-red-400 rounded transition-colors">
+                  <button
+                    onClick={() => deleteLegacyBooking(b.id)}
+                    aria-label="Ta bort historisk bokning"
+                    className="p-1 hover:bg-red-50 text-slate-300 hover:text-red-400 rounded transition-colors cursor-pointer"
+                  >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>

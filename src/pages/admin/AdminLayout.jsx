@@ -39,14 +39,18 @@ function AdminSubnav() {
         <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1">
           <button
             onClick={() => setYear((y) => y - 1)}
-            className="p-1 hover:bg-slate-200 rounded transition-colors"
+            className="p-1 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+            title="Föregående år"
+            aria-label="Föregående år"
           >
             <ChevronLeft className="w-3.5 h-3.5 text-slate-500" />
           </button>
           <span className="text-sm font-semibold text-slate-700 w-10 text-center">{year}</span>
           <button
             onClick={() => setYear((y) => y + 1)}
-            className="p-1 hover:bg-slate-200 rounded transition-colors"
+            className="p-1 hover:bg-slate-200 rounded transition-colors cursor-pointer"
+            title="Nästa år"
+            aria-label="Nästa år"
           >
             <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
           </button>
@@ -120,7 +124,9 @@ function MemberModal() {
           </div>
           <button
             onClick={() => { setSelectedMember(null); setEditForm(null) }}
-            className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+            className="p-1 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            aria-label="Stäng medlemsdetaljer"
+            title="Stäng"
           >
             <X className="w-5 h-5 text-slate-400" />
           </button>
