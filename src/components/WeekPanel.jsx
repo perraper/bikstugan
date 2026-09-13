@@ -9,6 +9,7 @@ import {
   joinReserveList,
   leaveReserveList,
   applyForLottery,
+  withdrawLotteryApplication,
 } from '../lib/booking-actions'
 import {
   X, Clock, Bed, Zap, AlertTriangle,
@@ -21,6 +22,7 @@ import LotterySection from './week-panel/LotterySection'
 import BookedSection from './week-panel/BookedSection'
 import AdminSection from './week-panel/AdminSection'
 import HistorySection from './week-panel/HistorySection'
+import BookingSuccessView from './week-panel/BookingSuccessView'
 
 const STATUS_BADGE = {
   available:   { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Ledig' },
@@ -183,9 +185,24 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
     setError('')
     try {
       await bookWeek({ profile, year, weekNumber: week.week_number, note: bookNote })
-      onClose(true)
+      onMutate?.()
+      setView('book-success')
     } catch (e) {
       setError(e.message || 'Något gick fel vid bokning.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleWithdrawLottery() {
+    setActionLoading(true)
+    setError('')
+    try {
+      await withdrawLotteryApplication({ profile, year, weekNumber: week.week_number })
+      await fetchData()
+      onMutate?.()
+    } catch (e) {
+      setError(e.message || 'Något gick fel när intresseanmälan togs bort.')
     } finally {
       setActionLoading(false)
     }
@@ -210,7 +227,8 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
     setError('')
     try {
       await applyForLottery({ profile, year, weekNumber: week.week_number })
-      onClose(true)
+      await fetchData()
+      onMutate?.()
     } catch (e) {
       setError(e.message || 'Något gick fel vid lottningsanmälan.')
     } finally {
@@ -314,6 +332,17 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
             />
           )}
 
+          {/* Bekräftelse efter genomförd bokning */}
+          {view === 'book-success' && (
+            <BookingSuccessView
+              weekNumber={week.week_number}
+              year={year}
+              dates={dates}
+              paymentRef={paymentReference(profile, year, week.week_number)}
+              onDone={() => onClose(true)}
+            />
+          )}
+
           {view === 'main' && (
             <>
               {/* Datum/info-block — visas alltid */}
@@ -354,6 +383,7 @@ export default function WeekPanel({ week, year, onClose, onMutate }) {
                       applied={!!ownLotteryApp}
                       loading={actionLoading}
                       onApply={handleLottery}
+                      onWithdraw={handleWithdrawLottery}
                     />
                   )}
 

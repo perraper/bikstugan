@@ -4,11 +4,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
 import { getWeekDateRange, formatDateLong, getSeasonPrice } from '../lib/weeks'
 import { PAYMENT, paymentReference } from '../lib/config'
-import { cancelBooking, acceptReserveOffer } from '../lib/booking-actions'
+import { cancelBooking, acceptReserveOffer, withdrawLotteryApplication } from '../lib/booking-actions'
 import { bookingsToIcs, downloadIcs } from '../lib/ical'
 import {
   CalendarCheck, Clock, Users, Ticket, Download,
-  AlertTriangle, RefreshCw,
+  AlertTriangle, RefreshCw, Trash2,
 } from 'lucide-react'
 import Spinner from '../components/Spinner'
 import CancelBookingConfirm from '../components/CancelBookingConfirm'
@@ -29,6 +29,7 @@ export default function BookingsPage() {
   const [reserveOffers, setReserveOffers] = useState([])
   const [acceptingOffer, setAcceptingOffer] = useState(null)
   const [confirmOffer, setConfirmOffer] = useState(null)
+  const [withdrawingAppId, setWithdrawingAppId] = useState(null)
 
   const fetchData = useCallback(async () => {
     if (!profile) return
@@ -163,6 +164,23 @@ export default function BookingsPage() {
       setActionError(e?.message || 'Kunde inte acceptera erbjudandet. Tidsfristen kan ha löpt ut.')
     } finally {
       setAcceptingOffer(null)
+    }
+  }
+
+  async function handleWithdrawLottery(app) {
+    if (!window.confirm(`Vill du ta bort din intresseanmälan för vecka ${app.week_number}, ${app.year}?`)) {
+      return
+    }
+    setWithdrawingAppId(app.id)
+    setActionError(null)
+    try {
+      await withdrawLotteryApplication({ profile, year: app.year, weekNumber: app.week_number })
+      await fetchData()
+    } catch (e) {
+      console.error('Kunde inte ta bort intresseanmälan:', e)
+      setActionError(e?.message || 'Kunde inte ta bort intresseanmälan. Försök igen.')
+    } finally {
+      setWithdrawingAppId(null)
     }
   }
 
@@ -413,6 +431,21 @@ export default function BookingsPage() {
                     {app.status === 'reserve' && app.reserve_rank && ` (#${app.reserve_rank})`}
                   </div>
                 </div>
+                {app.status === 'pending' && (
+                  <button
+                    onClick={() => handleWithdrawLottery(app)}
+                    disabled={withdrawingAppId === app.id}
+                    className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-slate-50 transition-colors shrink-0 cursor-pointer disabled:opacity-50"
+                    title="Ta bort intresseanmälan"
+                    aria-label={`Ta bort intresseanmälan för vecka ${app.week_number}`}
+                  >
+                    {withdrawingAppId === app.id ? (
+                      <Spinner className="w-4 h-4" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </div>
             )
           })

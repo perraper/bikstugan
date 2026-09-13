@@ -42,27 +42,32 @@ export function AdminProvider({ children }) {
   }
 
   async function fetchData() {
-    const { data: weekData } = await supabase
-      .from('weeks')
-      .select('*, booked_by:users(id, name, email, phone)')
-      .eq('year', year)
-      .order('week_number')
-    setWeeks(weekData || [])
+    const [weekRes, appRes, bookingRes] = await Promise.all([
+      supabase
+        .from('weeks')
+        .select('*, booked_by:users(id, name, email, phone)')
+        .eq('year', year)
+        .order('week_number'),
+      supabase
+        .from('lottery_applications')
+        .select('*, user:users(id, name, email, phone)')
+        .eq('year', year)
+        .order('week_number'),
+      supabase
+        .from('bookings')
+        .select('*, user:users(id, name, email, phone)')
+        .eq('year', year)
+        .order('week_number'),
+    ])
 
-    const { data: appData } = await supabase
-      .from('lottery_applications')
-      .select('*, user:users(id, name, email, phone)')
-      .eq('year', year)
-      .order('week_number')
-    setLotteryApps(appData || [])
+    const weekData = weekRes.data || []
+    const appData = appRes.data || []
+    const bookingData = bookingRes.data || []
 
-    const { data: bookingData } = await supabase
-      .from('bookings')
-      .select('*, user:users(id, name, email, phone)')
-      .eq('year', year)
-      .order('week_number')
+    setWeeks(weekData)
+    setLotteryApps(appData)
 
-    const ids = (bookingData || []).map((b) => b.id)
+    const ids = bookingData.map((b) => b.id)
     let readingMap = {}
     if (ids.length) {
       const { data: readingData } = await supabase
@@ -71,7 +76,7 @@ export function AdminProvider({ children }) {
         .in('booking_id', ids)
       for (const r of readingData || []) readingMap[r.booking_id] = r
     }
-    setAllBookings((bookingData || []).map((b) => ({ ...b, electricity: readingMap[b.id] || null })))
+    setAllBookings(bookingData.map((b) => ({ ...b, electricity: readingMap[b.id] || null })))
   }
 
   const isDeleted = (u) => u.email?.endsWith('@deleted.local')

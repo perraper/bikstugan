@@ -245,3 +245,14 @@ export async function applyForLottery({ profile, year, weekNumber }) {
   })
   if (error) throw error
 }
+
+export async function withdrawLotteryApplication({ profile, year, weekNumber }) {
+  const { error } = await supabase
+    .from('lottery_applications')
+    .delete()
+    .eq('user_id', profile.id)
+    .eq('year', year)
+    .eq('week_number', weekNumber)
+    .eq('status', 'pending')
+  if (error) throw error
+}

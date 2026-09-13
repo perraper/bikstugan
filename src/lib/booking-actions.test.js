@@ -56,6 +56,7 @@ import {
   joinReserveList,
   leaveReserveList,
   applyForLottery,
+  withdrawLotteryApplication,
   isRefundable,
   weeksUntilCheckin,
 } from './booking-actions'
@@ -310,5 +311,22 @@ describe('applyForLottery', () => {
     await expect(
       applyForLottery({ profile, year: 2099, weekNumber: 30 })
     ).rejects.toMatchObject({ message: 'duplicate' })
+  })
+})
+
+describe('withdrawLotteryApplication', () => {
+  it('raderar pending-rad', async () => {
+    await withdrawLotteryApplication({ profile, year: 2099, weekNumber: 30 })
+    const del = calls.find((c) => c.table === 'lottery_applications' && c.op === 'delete')
+    expect(del).toBeDefined()
+    const filterCols = del.filters.map((f) => f.col).sort()
+    expect(filterCols).toEqual(['status', 'user_id', 'week_number', 'year'])
+  })
+
+  it('kastar om delete misslyckas', async () => {
+    setResponses('lottery_applications', 'delete', { error: { message: 'network error' } })
+    await expect(
+      withdrawLotteryApplication({ profile, year: 2099, weekNumber: 30 })
+    ).rejects.toMatchObject({ message: 'network error' })
   })
 })
