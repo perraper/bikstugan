@@ -10,7 +10,7 @@ export default function BetalningarPage() {
     year, weeks, totalWeeks, allBookings,
     toggleDepositPaid, toggleFinalPaid, toggleElectricityPaid,
     markRefunded, markFinalRefunded,
-    finalRemaining, cancelBookingAdmin, sendReminder, saveElectricity, showMemberBookings
+    finalRemaining, cancelBookingAdmin, sendReminder, saveElectricity
   } = useAdmin()
 
   const [filter, setFilter] = useState('all') // 'all' | 'unpaid_deposit' | 'unpaid_final' | 'unpaid_electricity' | 'paid_deposit'

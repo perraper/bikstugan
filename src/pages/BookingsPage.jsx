@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/useAuth'
@@ -6,10 +6,15 @@ import { getWeekDateRange, formatDateLong, getSeasonPrice } from '../lib/weeks'
 import { PAYMENT, paymentReference } from '../lib/config'
 import { cancelBooking, acceptReserveOffer } from '../lib/booking-actions'
 import { bookingsToIcs, downloadIcs } from '../lib/ical'
-import { CalendarCheck, CalendarDays, Clock, Users, Ticket, Download, CreditCard, CheckCircle2, MessageSquare, Pencil, Save } from 'lucide-react'
+import {
+  CalendarCheck, Clock, Users, Ticket, Download,
+  AlertTriangle, RefreshCw,
+} from 'lucide-react'
 import Spinner from '../components/Spinner'
 import CancelBookingConfirm from '../components/CancelBookingConfirm'
 import CountdownBadge from '../components/CountdownBadge'
+import BookingPaymentInfo from '../components/BookingPaymentInfo'
+import BookingNoteEditor from '../components/BookingNoteEditor'
 
 export default function BookingsPage() {
   const { profile } = useAuth()
@@ -17,84 +22,100 @@ export default function BookingsPage() {
   const [neighbors, setNeighbors] = useState({})
   const [lotteryApps, setLotteryApps] = useState([])
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
+  const [actionError, setActionError] = useState(null)
   const [cancelTarget, setCancelTarget] = useState(null)
   const [cancelling, setCancelling] = useState(false)
   const [reserveOffers, setReserveOffers] = useState([])
   const [acceptingOffer, setAcceptingOffer] = useState(null)
-  const [editingNoteId, setEditingNoteId] = useState(null)
-  const [noteDraft, setNoteDraft] = useState('')
   const [confirmOffer, setConfirmOffer] = useState(null)
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     if (!profile) return
+    setLoading(true)
+    setFetchError(null)
 
-    const [{ data: bookingData }, { data: lotteryData }, { data: offerData }] = await Promise.all([
-      supabase
-        .from('bookings')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('status', 'confirmed')
-        .order('year', { ascending: true })
-        .order('week_number', { ascending: true }),
-      supabase
-        .from('lottery_applications')
-        .select('*')
-        .eq('user_id', profile.id)
-        .order('year', { ascending: true })
-        .order('week_number', { ascending: true }),
-      supabase
-        .from('reserve_offers')
-        .select('*')
-        .eq('offered_to_user_id', profile.id)
-        .eq('status', 'pending')
-        .gt('deadline', new Date().toISOString()),
-    ])
+    try {
+      const [bookingsRes, lotteryRes, offersRes] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select('*')
+          .eq('user_id', profile.id)
+          .eq('status', 'confirmed')
+          .order('year', { ascending: true })
+          .order('week_number', { ascending: true }),
+        supabase
+          .from('lottery_applications')
+          .select('*')
+          .eq('user_id', profile.id)
+          .order('year', { ascending: true })
+          .order('week_number', { ascending: true }),
+        supabase
+          .from('reserve_offers')
+          .select('*')
+          .eq('offered_to_user_id', profile.id)
+          .eq('status', 'pending')
+          .gt('deadline', new Date().toISOString()),
+      ])
 
-    setBookings(bookingData || [])
-    setLotteryApps(lotteryData || [])
-    setReserveOffers(offerData || [])
+      if (bookingsRes.error) throw bookingsRes.error
+      if (lotteryRes.error) throw lotteryRes.error
+      if (offersRes.error) throw offersRes.error
 
-    if (bookingData?.length) {
-      // Hämta alla grannar i en enda query per år istället för en per bokning.
-      const yearGroups = new Map()
-      for (const b of bookingData) {
-        const set = yearGroups.get(b.year) ?? new Set()
-        set.add(b.week_number - 1)
-        set.add(b.week_number + 1)
-        yearGroups.set(b.year, set)
-      }
-      const yearWeeks = await Promise.all(
-        Array.from(yearGroups.entries()).map(([year, weeks]) =>
-          supabase
-            .from('weeks')
-            .select('year, week_number, booked_by:users(name, phone)')
-            .eq('year', year)
-            .eq('status', 'booked')
-            .in('week_number', Array.from(weeks))
-            .then(({ data }) => data || [])
-        )
-      )
-      const lookup = new Map()
-      for (const rows of yearWeeks) {
-        for (const w of rows) lookup.set(`${w.year}-${w.week_number}`, w.booked_by)
-      }
-      const neighborMap = {}
-      for (const b of bookingData) {
-        neighborMap[`${b.year}-${b.week_number}`] = {
-          before: lookup.get(`${b.year}-${b.week_number - 1}`),
-          after: lookup.get(`${b.year}-${b.week_number + 1}`),
+      const bookingData = bookingsRes.data || []
+      setBookings(bookingData)
+      setLotteryApps(lotteryRes.data || [])
+      setReserveOffers(offersRes.data || [])
+
+      if (bookingData.length) {
+        const yearGroups = new Map()
+        for (const b of bookingData) {
+          const set = yearGroups.get(b.year) ?? new Set()
+          set.add(b.week_number - 1)
+          set.add(b.week_number + 1)
+          yearGroups.set(b.year, set)
         }
-      }
-      setNeighbors(neighborMap)
-    }
 
-    setLoading(false)
-  }
+        const yearWeeks = await Promise.all(
+          Array.from(yearGroups.entries()).map(([yr, weeks]) =>
+            supabase
+              .from('weeks')
+              .select('year, week_number, booked_by:users(name, phone)')
+              .eq('year', yr)
+              .eq('status', 'booked')
+              .in('week_number', Array.from(weeks))
+              .then(({ data, error }) => {
+                if (error) throw error
+                return data || []
+              })
+          )
+        )
+
+        const lookup = new Map()
+        for (const rows of yearWeeks) {
+          for (const w of rows) lookup.set(`${w.year}-${w.week_number}`, w.booked_by)
+        }
+
+        const neighborMap = {}
+        for (const b of bookingData) {
+          neighborMap[`${b.year}-${b.week_number}`] = {
+            before: lookup.get(`${b.year}-${b.week_number - 1}`),
+            after: lookup.get(`${b.year}-${b.week_number + 1}`),
+          }
+        }
+        setNeighbors(neighborMap)
+      }
+    } catch (err) {
+      console.error('Fel vid hämtning av bokningar:', err)
+      setFetchError('Kunde inte hämta dina bokningar. Kontrollera nätverksanslutningen.')
+    } finally {
+      setLoading(false)
+    }
+  }, [profile])
 
   useEffect(() => {
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile])
+  }, [fetchData])
 
   useEffect(() => {
     if (!profile) return
@@ -113,37 +134,46 @@ export default function BookingsPage() {
       if (timer) clearTimeout(timer)
       supabase.removeChannel(channel)
     }
-  }, [profile])
+  }, [profile, fetchData])
 
   async function handleCancel(booking) {
     setCancelling(true)
+    setActionError(null)
     try {
       await cancelBooking({ profile, booking })
+      setCancelTarget(null)
+      await fetchData()
     } catch (e) {
-      console.error(e)
+      console.error('Avbokning misslyckades:', e)
+      setActionError(e?.message || 'Kunde inte avboka veckan. Försök igen.')
+    } finally {
+      setCancelling(false)
     }
-    setCancelTarget(null)
-    setCancelling(false)
-    fetchData()
   }
 
   async function acceptOffer(offer) {
     setAcceptingOffer(offer.id)
+    setActionError(null)
     try {
       await acceptReserveOffer({ profile, offer })
+      setConfirmOffer(null)
+      await fetchData()
     } catch (e) {
-      console.error(e)
+      console.error('Kunde inte acceptera erbjudandet:', e)
+      setActionError(e?.message || 'Kunde inte acceptera erbjudandet. Tidsfristen kan ha löpt ut.')
+    } finally {
+      setAcceptingOffer(null)
     }
-    setAcceptingOffer(null)
-    fetchData()
   }
 
-  async function saveNote(bookingId) {
-    const trimmed = noteDraft.trim().slice(0, 200)
-    await supabase.from('bookings').update({ note: trimmed || null }).eq('id', bookingId)
-    setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, note: trimmed || null } : b))
-    setEditingNoteId(null)
-    setNoteDraft('')
+  async function handleSaveNote(bookingId, noteText) {
+    const trimmed = (noteText || '').trim().slice(0, 200)
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ note: trimmed || null })
+      .eq('id', bookingId)
+    if (updateError) throw updateError
+    setBookings((prev) => prev.map((b) => (b.id === bookingId ? { ...b, note: trimmed || null } : b)))
   }
 
   const statusLabel = {
@@ -178,13 +208,40 @@ export default function BookingsPage() {
         <p className="text-slate-400 text-sm mt-0.5">Bekräftade bokningar och lottningsanmälningar</p>
       </div>
 
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-red-700 text-sm">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" />
+            <span>{fetchError}</span>
+          </div>
+          <button
+            onClick={fetchData}
+            className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Försök igen
+          </button>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+            <span>{actionError}</span>
+          </div>
+          <button onClick={() => setActionError(null)} className="text-xs text-red-500 hover:underline">
+            Stäng
+          </button>
+        </div>
+      )}
+
       {reserveOffers.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-xs font-semibold text-amber-500 uppercase tracking-wide">Erbjudande — svara inom 48h</h2>
           {reserveOffers.map((offer) => {
             const dates = getWeekDateRange(offer.year, offer.week_number)
             const deadline = new Date(offer.deadline)
-             
             const hoursLeft = Math.max(0, Math.round((deadline - Date.now()) / 3600000))
             return (
               <div key={offer.id} className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3 shadow-sm">
@@ -292,93 +349,18 @@ export default function BookingsPage() {
                   </span>
                 </div>
 
-                {b.deposit_paid ? (
-                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-xs text-emerald-700">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    Anmälningsavgift {b.deposit_amount || PAYMENT.depositAmount} kr betald
-                  </div>
-                ) : (
-                  <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 space-y-1">
-                    <div className="flex items-center gap-2 text-xs text-amber-800 font-medium">
-                      <CreditCard className="w-3.5 h-3.5 shrink-0" />
-                      Anmälningsavgift {b.deposit_amount || PAYMENT.depositAmount} kr — ej betald
-                    </div>
-                    <div className="text-[11px] text-amber-700">
-                      Plusgiro: <strong>{PAYMENT.plusgiro}</strong> ({PAYMENT.payee}) · Meddelande: <strong>{reference}</strong>
-                    </div>
-                  </div>
-                )}
+                {/* Återanvändbar betalningsinformation (DRY) */}
+                <BookingPaymentInfo
+                  booking={b}
+                  paymentRef={reference}
+                  compact
+                />
 
-                {(() => {
-                  const remaining = Math.max(0, (b.price || 0) - (b.deposit_amount || PAYMENT.depositAmount))
-                  if (remaining === 0) return null
-                  return b.final_paid ? (
-                    <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 text-xs text-emerald-700">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      Slutbetalning {remaining.toLocaleString('sv-SE')} kr betald
-                    </div>
-                  ) : (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 space-y-1">
-                      <div className="flex items-center gap-2 text-xs text-slate-700 font-medium">
-                        <CreditCard className="w-3.5 h-3.5 shrink-0" />
-                        Slutbetalning {remaining.toLocaleString('sv-SE')} kr — ej betald
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        Plusgiro: <strong>{PAYMENT.plusgiro}</strong> ({PAYMENT.payee}) · Meddelande: <strong>{reference}</strong>
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                {editingNoteId === b.id ? (
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-2">
-                    <textarea
-                      value={noteDraft}
-                      onChange={(e) => setNoteDraft(e.target.value.slice(0, 200))}
-                      rows={2}
-                      autoFocus
-                      placeholder="Kommentar till bokningen (max 200 tecken)..."
-                      className="w-full bg-white border border-slate-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/40 resize-none"
-                    />
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">{noteDraft.length}/200</span>
-                      <div className="flex gap-1.5">
-                        <button
-                          onClick={() => { setEditingNoteId(null); setNoteDraft('') }}
-                          className="text-[11px] text-slate-500 hover:text-slate-700 px-2 py-1"
-                        >
-                          Avbryt
-                        </button>
-                        <button
-                          onClick={() => saveNote(b.id)}
-                          className="flex items-center gap-1 text-[11px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded"
-                        >
-                          <Save className="w-3 h-3" />
-                          Spara
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : b.note ? (
-                  <div className="flex items-start gap-2 bg-slate-50 rounded-lg px-3 py-2 group">
-                    <MessageSquare className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-slate-600 flex-1 whitespace-pre-wrap">{b.note}</p>
-                    <button
-                      onClick={() => { setEditingNoteId(b.id); setNoteDraft(b.note) }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-slate-600"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { setEditingNoteId(b.id); setNoteDraft('') }}
-                    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    Lägg till kommentar
-                  </button>
-                )}
+                {/* Återanvändbar anteckningsredigerare (DRY) */}
+                <BookingNoteEditor
+                  note={b.note}
+                  onSave={(newNote) => handleSaveNote(b.id, newNote)}
+                />
 
                 {nb && (nb.before || nb.after) && (
                   <div className="bg-slate-50 rounded-lg p-3 space-y-1">
@@ -449,33 +431,29 @@ export default function BookingsPage() {
                 <h3 className="text-base font-semibold text-slate-800">Bekräfta bokning</h3>
                 <p className="text-xs text-slate-400 mt-0.5">{hoursLeft}h kvar att svara på erbjudandet</p>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3 space-y-1.5">
-                <div className="text-sm font-medium text-slate-800">
+              <div className="bg-slate-50 rounded-lg p-3 space-y-1 text-xs text-slate-600">
+                <div className="font-medium text-slate-800">
                   Vecka {confirmOffer.week_number}, {confirmOffer.year}
                 </div>
-                <div className="text-xs text-slate-500 flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  {formatDateLong(dates.checkIn)} – {formatDateLong(dates.checkOut)}
+                <div>{formatDateLong(dates.checkIn)} – {formatDateLong(dates.checkOut)}</div>
+                <div className="text-slate-400">{season.label} · {season.price} kr</div>
+                <div className="border-t border-slate-200 pt-1 mt-1 text-[11px] text-slate-500">
+                  {PAYMENT.depositAmount} kr i anmälningsavgift faktureras nu, resterande {remaining} kr senare.
                 </div>
-                <div className="text-xs text-slate-500">{season.label} · <strong className="text-slate-700">{season.price} kr</strong></div>
-              </div>
-              <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 text-xs text-amber-800">
-                <CreditCard className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
-                <strong>{PAYMENT.depositAmount} kr</strong> i anmälningsavgift på plusgiro — resterande <strong>{remaining} kr</strong> faktureras.
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => setConfirmOffer(null)}
-                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg px-4 py-2.5 text-sm transition-colors"
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg px-4 py-2 text-sm transition-colors"
                 >
                   Avbryt
                 </button>
                 <button
-                  onClick={() => { acceptOffer(confirmOffer); setConfirmOffer(null) }}
+                  onClick={() => acceptOffer(confirmOffer)}
                   disabled={acceptingOffer === confirmOffer.id}
-                  className="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2.5 text-sm flex items-center justify-center gap-2 transition-colors"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-medium rounded-lg px-4 py-2 text-sm flex items-center justify-center gap-1 transition-colors"
                 >
-                  {acceptingOffer === confirmOffer.id ? <Spinner /> : 'Bekräfta bokning'}
+                  {acceptingOffer === confirmOffer.id ? <Spinner /> : 'Bekräfta'}
                 </button>
               </div>
             </div>
@@ -484,16 +462,12 @@ export default function BookingsPage() {
       })()}
 
       {cancelTarget && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm px-4 pb-4">
-          <div className="bg-white border border-slate-200 rounded-xl shadow-xl w-full max-w-sm p-5">
-            <CancelBookingConfirm
-              booking={cancelTarget}
-              onCancel={() => setCancelTarget(null)}
-              onConfirm={() => handleCancel(cancelTarget)}
-              loading={cancelling}
-            />
-          </div>
-        </div>
+        <CancelBookingConfirm
+          booking={cancelTarget}
+          onCancel={() => setCancelTarget(null)}
+          onConfirm={() => handleCancel(cancelTarget)}
+          loading={cancelling}
+        />
       )}
     </div>
   )

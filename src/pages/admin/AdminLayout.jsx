@@ -56,7 +56,7 @@ function AdminSubnav() {
       {/* Subnav links */}
       <div className="relative">
         <nav className="px-4 flex gap-0.5 overflow-x-auto py-1.5" style={{ scrollbarWidth: 'none' }}>
-          {SUBNAV.map(({ to, label, icon: Icon, badgeKey }) => { // eslint-disable-line no-unused-vars
+          {SUBNAV.map(({ to, label, icon: Icon, badgeKey }) => {
             const badge = badgeKey ? (badges[badgeKey] ?? 0) : 0
             return (
               <NavLink
@@ -141,7 +141,7 @@ function MemberModal() {
               { label: 'Namn', key: 'name', type: 'text', icon: User, note: null },
               { label: 'E-post', key: 'email', type: 'email', icon: Mail, note: 'Ändras både i auth (inloggning) och medlemsregistret. Ingen bekräftelse skickas.' },
               { label: 'Telefon', key: 'phone', type: 'tel', icon: Phone, note: null },
-            ].map(({ label, key, type, icon: Icon, note }) => ( // eslint-disable-line no-unused-vars
+            ].map(({ label, key, type, icon: Icon, note }) => (
               <div key={key}>
                 <label className="block text-[11px] text-slate-400 mb-1">{label}</label>
                 <div className="relative">

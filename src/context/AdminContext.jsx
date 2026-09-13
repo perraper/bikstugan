@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { getWeeksForYear } from '../lib/weeks'
@@ -141,10 +141,16 @@ export function AdminProvider({ children }) {
   async function toggleDepositPaid(booking) {
     const newPaid = !booking.deposit_paid
     const newPaidAt = newPaid ? new Date().toISOString() : null
-    await supabase
+    const { error } = await supabase
       .from('bookings')
       .update({ deposit_paid: newPaid, deposit_paid_at: newPaidAt })
       .eq('id', booking.id)
+
+    if (error) {
+      alert('Kunde inte ändra betalstatus: ' + error.message)
+      return
+    }
+
     setAllBookings((prev) =>
       prev.map((b) => b.id === booking.id ? { ...b, deposit_paid: newPaid, deposit_paid_at: newPaidAt } : b)
     )
@@ -157,10 +163,16 @@ export function AdminProvider({ children }) {
   async function toggleFinalPaid(booking) {
     const newPaid = !booking.final_paid
     const newPaidAt = newPaid ? new Date().toISOString() : null
-    await supabase
+    const { error } = await supabase
       .from('bookings')
       .update({ final_paid: newPaid, final_paid_at: newPaidAt })
       .eq('id', booking.id)
+
+    if (error) {
+      alert('Kunde inte ändra slutbetalning: ' + error.message)
+      return
+    }
+
     setAllBookings((prev) =>
       prev.map((b) => b.id === booking.id ? { ...b, final_paid: newPaid, final_paid_at: newPaidAt } : b)
     )
@@ -172,9 +184,13 @@ export function AdminProvider({ children }) {
 
   async function approveUser(userId) {
     setApprovingId(userId)
-    await supabase.from('users').update({ approved: true }).eq('id', userId)
-    logAdminAction('user.approve', { table: 'users', id: userId })
-    fetchPendingUsers()
+    const { error } = await supabase.from('users').update({ approved: true }).eq('id', userId)
+    if (error) {
+      alert('Kunde inte godkänna användare: ' + error.message)
+    } else {
+      logAdminAction('user.approve', { table: 'users', id: userId })
+      await fetchPendingUsers()
+    }
     setApprovingId(null)
   }
 
@@ -186,9 +202,13 @@ export function AdminProvider({ children }) {
       danger: true,
       onConfirm: async () => {
         setApprovingId(user.id)
-        await supabase.from('users').delete().eq('id', user.id)
-        logAdminAction('user.reject', { table: 'users', id: user.id, details: { name: user.name, email: user.email } })
-        setPendingUsers((prev) => prev.filter((u) => u.id !== user.id))
+        const { error } = await supabase.from('users').delete().eq('id', user.id)
+        if (error) {
+          alert('Kunde inte avvisa användare: ' + error.message)
+        } else {
+          logAdminAction('user.reject', { table: 'users', id: user.id, details: { name: user.name, email: user.email } })
+          setPendingUsers((prev) => prev.filter((u) => u.id !== user.id))
+        }
         setApprovingId(null)
         setConfirmDialog(null)
       },
@@ -197,7 +217,11 @@ export function AdminProvider({ children }) {
 
   async function toggleAdmin(userId, currentRole) {
     const newRole = currentRole === 'admin' ? 'member' : 'admin'
-    await supabase.from('users').update({ role: newRole }).eq('id', userId)
+    const { error } = await supabase.from('users').update({ role: newRole }).eq('id', userId)
+    if (error) {
+      alert('Kunde inte ändra administratörsroll: ' + error.message)
+      return
+    }
     setAllUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role: newRole } : u))
     logAdminAction('user.toggle_admin', {
       table: 'users', id: userId,
@@ -228,7 +252,11 @@ export function AdminProvider({ children }) {
   }
 
   async function markRefunded(booking) {
-    await supabase.from('bookings').update({ deposit_refundable: false, deposit_paid: false }).eq('id', booking.id)
+    const { error } = await supabase.from('bookings').update({ deposit_refundable: false, deposit_paid: false }).eq('id', booking.id)
+    if (error) {
+      alert('Kunde inte markera återbetalning: ' + error.message)
+      return
+    }
     setAllBookings((prev) =>
       prev.map((b) => b.id === booking.id ? { ...b, deposit_refundable: false, deposit_paid: false } : b)
     )
@@ -239,7 +267,11 @@ export function AdminProvider({ children }) {
   }
 
   async function markFinalRefunded(booking) {
-    await supabase.from('bookings').update({ final_refundable: false, final_paid: false }).eq('id', booking.id)
+    const { error } = await supabase.from('bookings').update({ final_refundable: false, final_paid: false }).eq('id', booking.id)
+    if (error) {
+      alert('Kunde inte markera slutlig återbetalning: ' + error.message)
+      return
+    }
     setAllBookings((prev) =>
       prev.map((b) => b.id === booking.id ? { ...b, final_refundable: false, final_paid: false } : b)
     )
@@ -396,30 +428,38 @@ export function AdminProvider({ children }) {
     downloadCsv(`medlemmar-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows)
   }
 
+  const contextValue = useMemo(() => ({
+    year, setYear,
+    weeks, totalWeeks,
+    allBookings, setAllBookings,
+    lotteryApps,
+    pendingUsers, allUsers,
+    approvingId,
+    openIssuesCount,
+    selectedMember, setSelectedMember,
+    memberBookings,
+    editForm, setEditForm,
+    savingEdit, editError,
+    confirmDialog, setConfirmDialog,
+    finalRemaining, formatLastSignIn,
+    fetchData, fetchPendingUsers,
+    toggleDepositPaid, toggleFinalPaid,
+    approveUser, rejectUser,
+    toggleAdmin, deleteMember,
+    markRefunded, markFinalRefunded,
+    showMemberBookings, startEditMember, saveMemberEdit,
+    exportMembersCSV,
+    cancelBookingAdmin, sendReminder, saveElectricity, toggleElectricityPaid,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [
+    year, weeks, totalWeeks, allBookings, lotteryApps,
+    pendingUsers, allUsers, approvingId, openIssuesCount,
+    selectedMember, memberBookings, editForm, savingEdit,
+    editError, confirmDialog,
+  ])
+
   return (
-    <AdminContext.Provider value={{
-      year, setYear,
-      weeks, totalWeeks,
-      allBookings, setAllBookings,
-      lotteryApps,
-      pendingUsers, allUsers,
-      approvingId,
-      openIssuesCount,
-      selectedMember, setSelectedMember,
-      memberBookings,
-      editForm, setEditForm,
-      savingEdit, editError,
-      confirmDialog, setConfirmDialog,
-      finalRemaining, formatLastSignIn,
-      fetchData, fetchPendingUsers,
-      toggleDepositPaid, toggleFinalPaid,
-      approveUser, rejectUser,
-      toggleAdmin, deleteMember,
-      markRefunded, markFinalRefunded,
-      showMemberBookings, startEditMember, saveMemberEdit,
-      exportMembersCSV,
-      cancelBookingAdmin, sendReminder, saveElectricity, toggleElectricityPaid,
-    }}>
+    <AdminContext.Provider value={contextValue}>
       {children}
     </AdminContext.Provider>
   )
